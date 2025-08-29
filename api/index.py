@@ -51,15 +51,10 @@ try:
     if not app:
         raise ImportError("Flask app object is None after import")
     
-    # Export the application for Vercel
-    # Vercel expects a callable WSGI application
-    def wsgi_handler(environ, start_response):
-        return app(environ, start_response)
-    
-    # Export with multiple names for compatibility
-    handler = wsgi_handler
-    application = wsgi_handler
-    app = wsgi_handler
+    # Export the Flask app for Vercel Functions
+    # For Flask on Vercel, only use 'app' - do NOT use 'handler'
+    # 'handler' should only be used for BaseHTTPRequestHandler classes
+    application = app
     
     logging.info("WSGI application configured for Vercel")
     
@@ -96,7 +91,7 @@ except Exception as import_error:
     def fallback_wsgi_handler(environ, start_response):
         return fallback_app(environ, start_response)
     
-    handler = fallback_wsgi_handler
+    # Do NOT use 'handler' for Flask apps - this causes the issubclass() error
     application = fallback_wsgi_handler
     app = fallback_wsgi_handler
     

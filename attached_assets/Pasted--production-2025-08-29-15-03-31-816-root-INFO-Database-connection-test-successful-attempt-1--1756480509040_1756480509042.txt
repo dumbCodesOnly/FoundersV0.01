@@ -1,0 +1,48 @@
+(production)
+2025-08-29 15:03:31,816 - root - INFO - Database connection test successful (attempt 1)
+2025-08-29 15:03:31,816 - root - INFO - Checking for bot owner with ID: 6042961158
+2025-08-29 15:03:31,816 - root - ERROR - Database initialization error: cannot access local variable 'models' where it is not associated with a value
+2025-08-29 15:03:31,817 - root - ERROR - Database error traceback: Traceback (most recent call last):
+File "/var/task/api/app.py", line 198, in init_database
+existing_owner = models.User.query.filter_by(telegram_id=app.config['BOT_OWNER_ID']).first()
+^^^^^^
+UnboundLocalError: cannot access local variable 'models' where it is not associated with a value
+2025-08-29 15:03:31,826 - root - INFO - Routes imported successfully
+2025-08-29 15:03:32,035 - root - INFO - Routes already imported at module level
+2025-08-29 15:03:32,036 - api.index - INFO - Flask app imported successfully in Vercel
+2025-08-29 15:03:32,036 - api.index - INFO - Flask app type: <class 'flask.app.Flask'>
+2025-08-29 15:03:32,036 - api.index - INFO - WSGI application configured for Vercel
+Traceback (most recent call last):
+File "/var/task/vc__handler__python.py", line 218, in <module>
+if not issubclass(base, BaseHTTPRequestHandler):
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: issubclass() arg 1 must be a class
+Python process exited with exit status: 1. The logs above can help with debugging the issue.
+2025-08-29 15:03:32,302 - api.index - INFO - Starting Vercel import process...
+2025-08-29 15:03:33,950 - root - WARNING - Using auto-generated session secret for Vercel deployment. Set SESSION_SECRET environment variable for security.
+2025-08-29 15:03:34,361 - root - INFO - Template functions registered successfully
+2025-08-29 15:03:34,361 - root - INFO - Detected environment: vercel
+2025-08-29 15:03:34,362 - root - INFO - Initializing app for vercel
+2025-08-29 15:03:34,362 - root - INFO - Initializing database for Vercel environment
+2025-08-29 15:03:34,362 - root - INFO - Models already imported
+2025-08-29 15:03:39,001 - root - INFO - Database tables created successfully
+2025-08-29 15:03:39,001 - root - INFO - Using PostgreSQL database (production)
+2025-08-29 15:03:39,665 - root - INFO - Database connection test successful (attempt 1)
+2025-08-29 15:03:39,665 - root - INFO - Checking for bot owner with ID: 6042961158
+2025-08-29 15:03:39,665 - root - ERROR - Database initialization error: cannot access local variable 'models' where it is not associated with a value
+2025-08-29 15:03:39,665 - root - ERROR - Database error traceback: Traceback (most recent call last):
+File "/var/task/api/app.py", line 198, in init_database
+existing_owner = models.User.query.filter_by(telegram_id=app.config['BOT_OWNER_ID']).first()
+^^^^^^
+UnboundLocalError: cannot access local variable 'models' where it is not associated with a value
+2025-08-29 15:03:39,674 - root - INFO - Routes imported successfully
+2025-08-29 15:03:39,893 - root - INFO - Routes already imported at module level
+2025-08-29 15:03:39,893 - api.index - INFO - Flask app imported successfully in Vercel
+2025-08-29 15:03:39,893 - api.index - INFO - Flask app type: <class 'flask.app.Flask'>
+2025-08-29 15:03:39,893 - api.index - INFO - WSGI application configured for Vercel
+Traceback (most recent call last):
+File "/var/task/vc__handler__python.py", line 218, in <module>
+if not issubclass(base, BaseHTTPRequestHandler):
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: issubclass() arg 1 must be a class
+Python process exited with exit status: 1. The logs above can help with debugging the issue.
