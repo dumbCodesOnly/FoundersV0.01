@@ -11,13 +11,5 @@
       "src": "/(.*)",
       "dest": "main.py"
     }
-  ],
-  "env": {
-    "PYTHONPATH": "/var/task"
-  },
-  "functions": {
-    "main.py": {
-      "runtime": "python3.11"
-    }
-  }
+  ]
 }
