@@ -1,6 +1,23 @@
 import requests
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
+
+# Cache storage with TTL
+_cache = {}
+_cache_ttl = {}
+
+def get_cached_value(key, ttl_minutes=10):
+    """Get cached value if still valid"""
+    if key in _cache and key in _cache_ttl:
+        if time.time() < _cache_ttl[key]:
+            return _cache[key]
+    return None
+
+def set_cached_value(key, value, ttl_minutes=10):
+    """Set cached value with TTL"""
+    _cache[key] = value
+    _cache_ttl[key] = time.time() + (ttl_minutes * 60)
 
 def format_gold_quantity(amount):
     """Format gold quantity in k format (1k, 2k, 1.5k, etc.)"""
@@ -29,6 +46,14 @@ def format_gold_quantity(amount):
 
 def get_exchange_rates():
     """Fetch live exchange rates from multiple sources with accurate Iranian Rial rates"""
+    # Check cache first (cache for 15 minutes to avoid repeated API calls)
+    cached_rates = get_cached_value('exchange_rates', 15)
+    if cached_rates:
+        logging.debug("Using cached exchange rates")
+        return cached_rates
+    
+    logging.debug("Fetching fresh exchange rates from APIs")
+    
     # Late imports to avoid circular dependency
     from .models import ExchangeRate
     from .app import db
@@ -226,6 +251,9 @@ def get_exchange_rates():
     except Exception as e:
         logging.error(f"Error updating exchange rates in database: {e}")
     
+    # Cache the rates for 15 minutes to avoid repeated API calls
+    set_cached_value('exchange_rates', rates, 15)
+    
     return rates
 
 def convert_currency(amount, from_currency, to_currency):
@@ -286,6 +314,14 @@ def convert_currency(amount, from_currency, to_currency):
 
 def calculate_inventory_and_profit():
     """Calculate remaining WoW gold inventory and profit using FIFO method"""
+    # Check cache first (cache for 5 minutes since this is expensive calculation)
+    cached_stats = get_cached_value('inventory_stats', 5)
+    if cached_stats:
+        logging.debug("Using cached inventory and profit stats")
+        return cached_stats
+    
+    logging.debug("Calculating fresh inventory and profit stats")
+    
     # Late imports to avoid circular dependency
     from .models import Purchase, Sale
     
@@ -338,7 +374,7 @@ def calculate_inventory_and_profit():
     profit_usd = convert_currency(profit_cad, 'CAD', 'USD')
     profit_irr = convert_currency(profit_cad, 'CAD', 'IRR')
     
-    return {
+    stats = {
         'remaining_inventory': remaining_inventory,  # WoW gold tokens remaining
         'remaining_inventory_value_cad': remaining_inventory_value,
         'total_purchases_cad': total_purchase_cost_cad,
@@ -349,3 +385,53 @@ def calculate_inventory_and_profit():
         'total_purchased': sum(p.gold_amount for p in purchases),
         'total_sold': sum(s.gold_amount for s in sales)
     }
+    
+    # Cache the stats for 5 minutes since this is an expensive calculation
+    set_cached_value('inventory_stats', stats, 5)
+    
+    return stats
+
+def get_user_from_session(session):
+    """Get user data from session cache or database as fallback"""
+    # Try to get cached user data from session first
+    if 'cached_user_data' in session and 'user_id' in session:
+        cached_data = session['cached_user_data']
+        # Check if cache is not too old (less than 1 hour)
+        if 'cached_at' in cached_data:
+            from datetime import datetime
+            try:
+                cached_time = datetime.fromisoformat(cached_data['cached_at'])
+                if (datetime.utcnow() - cached_time).seconds < 3600:  # 1 hour
+                    # Create a simple user object from cached data
+                    class CachedUser:
+                        def __init__(self, data):
+                            self.id = session['user_id']
+                            self.telegram_id = session.get('telegram_id')
+                            self.first_name = data.get('first_name', '')
+                            self.last_name = data.get('last_name', '')
+                            self.username = data.get('username', '')
+                            self.photo_url = data.get('photo_url', '')
+                            self.is_whitelisted = data.get('is_whitelisted', False)
+                            self.is_admin = data.get('is_admin', False)
+                            
+                        @property
+                        def full_name(self):
+                            return f"{self.first_name} {self.last_name}".strip()
+                    
+                    return CachedUser(cached_data)
+            except (ValueError, TypeError):
+                pass
+    
+    # Fallback to database query if cache miss or invalid
+    if 'user_id' in session:
+        from .models import User
+        return User.query.get(session['user_id'])
+    
+    return None
+
+def clear_inventory_cache():
+    """Clear inventory cache when data changes"""
+    if 'inventory_stats' in _cache:
+        del _cache['inventory_stats']
+    if 'inventory_stats' in _cache_ttl:
+        del _cache_ttl['inventory_stats']

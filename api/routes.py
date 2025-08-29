@@ -162,8 +162,9 @@ def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
-    # Get current user
-    user = User.query.get(session['user_id'])
+    # Get current user (using cache for performance)
+    from .utils import get_user_from_session
+    user = get_user_from_session(session)
     if not user:
         session.clear()
         return redirect(url_for('login'))
@@ -174,9 +175,9 @@ def dashboard():
     # Calculate inventory and profit
     stats = calculate_inventory_and_profit()
     
-    # Get recent transactions
-    recent_purchases = Purchase.query.order_by(Purchase.created_at.desc()).limit(5).all()
-    recent_sales = Sale.query.order_by(Sale.created_at.desc()).limit(5).all()
+    # Get recent transactions (optimized with smaller limits for faster loading)
+    recent_purchases = Purchase.query.order_by(Purchase.created_at.desc()).limit(3).all()
+    recent_sales = Sale.query.order_by(Sale.created_at.desc()).limit(3).all()
     
     return render_template('dashboard.html', 
                          user=user,
@@ -190,7 +191,9 @@ def purchase():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
-    user = User.query.get(session['user_id'])
+    # Get current user (using cache for performance)
+    from .utils import get_user_from_session
+    user = get_user_from_session(session)
     if not user or not user.is_whitelisted:
         flash('Access denied', 'error')
         return redirect(url_for('dashboard'))
@@ -227,6 +230,10 @@ def purchase():
             db.session.add(purchase)
             db.session.commit()
             
+            # Clear inventory cache since data changed
+            from .utils import clear_inventory_cache
+            clear_inventory_cache()
+            
             flash(f'Purchase recorded: {gold_amount_k}k WoW gold from {seller}', 'success')
             return redirect(url_for('dashboard'))
             
@@ -244,7 +251,9 @@ def sale():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
-    user = User.query.get(session['user_id'])
+    # Get current user (using cache for performance)
+    from .utils import get_user_from_session
+    user = get_user_from_session(session)
     if not user or not user.is_whitelisted:
         flash('Access denied', 'error')
         return redirect(url_for('dashboard'))
@@ -291,6 +300,10 @@ def sale():
             db.session.add(sale)
             db.session.commit()
             
+            # Clear inventory cache since data changed
+            from .utils import clear_inventory_cache
+            clear_inventory_cache()
+            
             flash(f'Sale recorded: {gold_amount_k}k WoW gold for ${net_revenue:.2f} CAD (net after {tax_fee_percentage}% tax/fees)', 'success')
             return redirect(url_for('dashboard'))
             
@@ -314,7 +327,9 @@ def admin():
         flash('Bot owner access required', 'error')
         return redirect(url_for('dashboard'))
     
-    user = User.query.get(session['user_id'])
+    # Get current user (using cache for performance)
+    from .utils import get_user_from_session
+    user = get_user_from_session(session)
     users = User.query.all()
     
     # Get current tax/fee percentage setting
