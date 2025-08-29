@@ -13,7 +13,7 @@
                 </a>
                 <h1 class="text-2xl font-bold">Record New Sale</h1>
             </div>
-            <p class="text-gray-600 dark:text-gray-400">Sell gold from your inventory</p>
+            <p class="text-gray-600 dark:text-gray-400">Sell WoW gold from your inventory</p>
         </div>
 
         <!-- Inventory Status -->
@@ -22,7 +22,7 @@
                 <i data-feather="package" class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-3"></i>
                 <div>
                     <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Available Inventory</p>
-                    <p class="text-lg font-bold text-yellow-900 dark:text-yellow-100">{{ "%.2f"|format(available_inventory) }} grams</p>
+                    <p class="text-lg font-bold text-yellow-900 dark:text-yellow-100">{{ format_gold_quantity(available_inventory) }}</p>
                 </div>
             </div>
         </div>
@@ -64,7 +64,7 @@
                 <!-- Gold Amount -->
                 <div>
                     <label for="gold_amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Gold Amount (grams)
+                        Gold Amount (e.g., 1000 for 1k, 1500 for 1.5k)
                     </label>
                     <input type="number" 
                            id="gold_amount" 
@@ -75,13 +75,13 @@
                            required
                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                            placeholder="0.00">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Maximum available: {{ "%.2f"|format(available_inventory) }}g</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Maximum available: {{ format_gold_quantity(available_inventory) }}</p>
                 </div>
 
                 <!-- Unit Price -->
                 <div>
                     <label for="unit_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Unit Price (CAD per gram)
+                        Unit Price (CAD per 1k gold)
                     </label>
                     <input type="number" 
                            id="unit_price" 

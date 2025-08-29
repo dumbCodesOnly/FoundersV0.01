@@ -1,6 +1,6 @@
 # Overview
 
-Founders Management is a Flask-based web application designed for gold trading businesses to manage purchases, sales, and inventory tracking. The system integrates with Telegram WebApp for user authentication and provides real-time exchange rate monitoring, profit calculations, and comprehensive transaction management.
+Founders Management is a Flask-based web application designed for World of Warcraft (WoW) gold trading businesses to manage purchases, sales, and inventory tracking. The system integrates with Telegram WebApp for user authentication and provides real-time exchange rate monitoring, profit calculations, and comprehensive transaction management. Gold quantities are displayed in the standard WoW format (1k, 2k, 1.5k, etc.).
 
 # User Preferences
 

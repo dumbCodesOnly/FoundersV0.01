@@ -98,6 +98,13 @@ def create_app():
     try:
         with app.app_context():
             init_database()
+            
+            # Import utils for template functions
+            from utils import format_gold_quantity
+            
+            # Make format function available in templates
+            app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+            
             # Import routes after database initialization
             import routes
         return app
