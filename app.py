@@ -14,22 +14,26 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 
 # Create the app
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=False)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure the database
-database_url = os.environ.get("DATABASE_URL", "sqlite:///founders_management.db")
-# Handle SQLite URL format
-if database_url.startswith("sqlite:///"):
+database_url = os.environ.get("DATABASE_URL")
+if database_url:
+    # Production environment (Vercel) - use PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
 else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    # Development environment (Replit) - use SQLite
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///founders_management.db"
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
 
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
+# Disable SQLAlchemy modifications tracking to save memory
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize the app with the extension
 db.init_app(app)
