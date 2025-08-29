@@ -103,6 +103,13 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # Initialize the app with the extension
 db.init_app(app)
 
+# Import models here to avoid circular imports
+with app.app_context():
+    from . import models
+    
+# Import routes after models to avoid circular imports
+from . import routes
+
 # App configuration using environment variables
 app.config.update(
     TELEGRAM_BOT_TOKEN=os.getenv("TELEGRAM_BOT_TOKEN", ""),
@@ -115,9 +122,7 @@ app.config.update(
 def init_database():
     """Initialize database tables and create default admin user"""
     try:
-        # Import models to ensure tables are created
-        from . import models
-        logging.info("Models imported successfully")
+        logging.info("Models already imported")
         
         # Create all tables
         db.create_all()
@@ -191,10 +196,6 @@ def create_app():
                     pass
             else:
                 init_database()
-            
-            # Import routes after database initialization
-            from . import routes
-            logging.info("Routes imported successfully")
         
         return app
         
@@ -202,19 +203,13 @@ def create_app():
         logging.error(f"App initialization error: {e}")
         logging.error(f"App initialization traceback: {traceback.format_exc()}")
         
-        # Fallback - still register template function and import routes
+        # Fallback - still register template function
         try:
             from .utils import format_gold_quantity
             app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
             logging.info("Template functions registered in fallback mode")
         except Exception as template_error:
             logging.error(f"Template function registration failed: {template_error}")
-        
-        try:
-            from . import routes
-            logging.info("Routes imported in fallback mode")
-        except Exception as route_error:
-            logging.error(f"Route import failed: {route_error}")
         
         return app
 
@@ -238,12 +233,9 @@ try:
     else:
         logging.info(f"Initializing app for {environment}")
         app_instance = create_app()
+        
+    logging.info("Routes already imported at module level")
 except Exception as e:
     logging.error(f"Critical app initialization error: {e}")
     logging.error(f"Initialization traceback: {traceback.format_exc()}")
-    # For serverless, we still need to initialize routes
-    try:
-        import routes
-        logging.info("Routes imported in fallback mode")
-    except Exception as route_error:
-        logging.error(f"Route import failed: {route_error}")
+    # Routes are already imported at module level, no fallback needed
