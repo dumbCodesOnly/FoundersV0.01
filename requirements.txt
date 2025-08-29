@@ -66,3 +66,8 @@ flask-dance
 flask-login
 oauthlib
 pyjwt
+email_validator
+flask
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
