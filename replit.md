@@ -59,6 +59,12 @@ Preferred communication style: Simple, everyday language.
 - **Werkzeug**: WSGI utilities including ProxyFix for deployment
 
 ## Development Environment
-- **SQLite**: Local development database
-- **PostgreSQL**: Production database support via environment configuration
+- **SQLite**: Local development database (Replit)
+- **Neon PostgreSQL**: Production database for Vercel deployment with optimized connection pooling
 - **Environment Variables**: Configuration management for API keys, database URLs, and application secrets
+
+## Deployment Configuration
+- **Hybrid Environment Support**: Automatically detects and configures for Replit (dev) vs Vercel (production)
+- **Neon Database Integration**: Optimized connection settings for Neon's serverless PostgreSQL
+- **SSL Security**: Required SSL connections for production database
+- **Connection Pooling**: Configured for Vercel's serverless environment

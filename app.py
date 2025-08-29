@@ -21,11 +21,19 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # Configure the database
 database_url = os.environ.get("DATABASE_URL")
 if database_url:
-    # Production environment (Vercel) - use PostgreSQL
+    # Production environment (Vercel + Neon) - use PostgreSQL
+    # Neon PostgreSQL connection with optimized settings
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_size": 5,
         "pool_recycle": 300,
         "pool_pre_ping": True,
+        "pool_timeout": 20,
+        "max_overflow": 0,
+        "connect_args": {
+            "sslmode": "require",
+            "connect_timeout": 10,
+        }
     }
 else:
     # Development environment (Replit) - use SQLite
@@ -45,25 +53,37 @@ app.config.update(
     DEBUG=True
 )
 
+# Initialize database and create tables
+def init_database():
+    """Initialize database tables and create default admin user"""
+    try:
+        # Import models to ensure tables are created
+        import models
+        
+        # Create all tables
+        db.create_all()
+        logging.info("Database tables created successfully")
+        
+        # Create default bot owner if specified
+        if app.config['BOT_OWNER_ID'] > 0:
+            existing_owner = models.User.query.filter_by(telegram_id=app.config['BOT_OWNER_ID']).first()
+            if not existing_owner:
+                owner = models.User()
+                owner.telegram_id = app.config['BOT_OWNER_ID']
+                owner.first_name = "Bot"
+                owner.last_name = "Owner" 
+                owner.username = "bot_owner"
+                owner.is_admin = True
+                owner.is_whitelisted = True
+                db.session.add(owner)
+                db.session.commit()
+                logging.info(f"Created bot owner with ID: {app.config['BOT_OWNER_ID']}")
+                
+    except Exception as e:
+        logging.error(f"Database initialization error: {e}")
+
+# Initialize database with proper context
 with app.app_context():
-    # Import models to ensure tables are created
-    import models
+    init_database()
+    # Import routes after database initialization
     import routes
-    
-    # Create all tables
-    db.create_all()
-    
-    # Create default bot owner if specified
-    if app.config['BOT_OWNER_ID'] > 0:
-        existing_owner = models.User.query.filter_by(telegram_id=app.config['BOT_OWNER_ID']).first()
-        if not existing_owner:
-            owner = models.User()
-            owner.telegram_id = app.config['BOT_OWNER_ID']
-            owner.first_name = "Bot"
-            owner.last_name = "Owner" 
-            owner.username = "bot_owner"
-            owner.is_admin = True
-            owner.is_whitelisted = True
-            db.session.add(owner)
-            db.session.commit()
-            logging.info(f"Created bot owner with ID: {app.config['BOT_OWNER_ID']}")
