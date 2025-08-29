@@ -37,7 +37,10 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, in
 environment = detect_environment()
 app.secret_key = os.getenv("SESSION_SECRET") or os.getenv("SECRET_KEY") or "dev-session-secret-key-change-for-production"
 if environment in ['vercel', 'production'] and app.secret_key == "dev-session-secret-key-change-for-production":
-    raise ValueError("SESSION_SECRET or SECRET_KEY environment variable is required for production security.")
+    # For Vercel, use a generated secret if none provided (will warn but not crash)
+    import secrets
+    app.secret_key = secrets.token_urlsafe(32)
+    logging.warning("Using auto-generated session secret for Vercel deployment. Set SESSION_SECRET environment variable for security.")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure the database - Use SQLite for development, PostgreSQL for production

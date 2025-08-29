@@ -18,9 +18,10 @@ try:
     logger.info("Flask app imported successfully in Vercel")
     
     # Export the application for Vercel (multiple export names for compatibility)
-    application = app
-    handler = app  # For Vercel serverless functions
-    app = app      # For Vercel WSGI apps
+    # Use the WSGI app directly
+    application = app.wsgi_app if hasattr(app, 'wsgi_app') else app
+    handler = application  # For Vercel serverless functions
+    app = application      # For Vercel WSGI apps
     
     logger.info("WSGI application configured for Vercel")
     
@@ -50,8 +51,9 @@ except Exception as e:
         })
     
     # Export fallback app with multiple names for Vercel
-    application = fallback_app
-    handler = fallback_app
-    app = fallback_app
+    fallback_wsgi = fallback_app.wsgi_app if hasattr(fallback_app, 'wsgi_app') else fallback_app
+    application = fallback_wsgi
+    handler = fallback_wsgi
+    app = fallback_wsgi
     
     logger.info("Fallback error app created for Vercel")
