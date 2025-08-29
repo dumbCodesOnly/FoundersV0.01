@@ -32,10 +32,7 @@ def create_application():
 # Create the app instance
 app = create_application()
 
-# This is what Vercel will invoke
-def handler(request, context=None):
-    return app
-
-# For WSGI compatibility
-def application(environ, start_response):
+# Vercel serverless function entry point
+def handler(environ, start_response):
+    """WSGI handler for Vercel"""
     return app(environ, start_response)
