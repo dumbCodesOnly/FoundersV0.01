@@ -225,6 +225,7 @@ environment = detect_environment()
 logging.info(f"Detected environment: {environment}")
 
 # Initialize the app based on environment
+app_instance = None
 try:
     if environment in ['vercel', 'production']:
         logging.info(f"Initializing app for {environment}")
@@ -238,4 +239,9 @@ try:
 except Exception as e:
     logging.error(f"Critical app initialization error: {e}")
     logging.error(f"Initialization traceback: {traceback.format_exc()}")
-    # Routes are already imported at module level, no fallback needed
+    # Use the base app object as fallback
+    app_instance = app
+
+# Ensure app is available at module level for Vercel imports
+if app_instance:
+    app = app_instance

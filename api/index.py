@@ -13,14 +13,20 @@ try:
     logger.info("Starting Vercel import process...")
     
     # Import the Flask app from the api directory
-    from .app import app
+    from .app import app as flask_app
     
     logger.info("Flask app imported successfully in Vercel")
+    
+    # Verify app is properly initialized
+    if not flask_app:
+        raise ImportError("Flask app object is None after import")
+    
+    logger.info(f"Flask app type: {type(flask_app)}")
     
     # Export the application for Vercel
     # Vercel expects a callable WSGI application
     def wsgi_handler(environ, start_response):
-        return app(environ, start_response)
+        return flask_app(environ, start_response)
     
     # Export with multiple names for compatibility
     handler = wsgi_handler
