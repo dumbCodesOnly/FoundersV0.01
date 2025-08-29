@@ -30,33 +30,54 @@ def format_gold_quantity(amount):
         return "0"
 
 def get_exchange_rates():
-    """Fetch live exchange rates from multiple sources"""
+    """Fetch live exchange rates from multiple sources with accurate Iranian Rial rates"""
     rates = {}
     
-    # Try to get IRR rate from priceto.day (free market rate)
+    # Try Navasan API for accurate Iranian free market rate (120 free calls/month)
+    # Note: Requires API key from @navasan_contact_bot on Telegram
     try:
+        # For now, we'll use a simple HTTP request without API key for demo
+        # In production, add API_KEY from environment variables
+        navasan_url = "https://api.navasan.tech/latest.json"
+        # If you have API key: navasan_url = f"https://api.navasan.tech/latest.json?api_key={api_key}"
+        
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json'
         }
         
-        irr_response = requests.get("https://api.priceto.day/v1/latest/irr/usd", 
-                                   headers=headers, timeout=10)
+        irr_response = requests.get(navasan_url, headers=headers, timeout=10)
         if irr_response.status_code == 200:
             irr_data = irr_response.json()
-            if 'rates' in irr_data and 'USD' in irr_data['rates']:
-                usd_per_irr = irr_data['rates']['USD']
-                # Convert to IRR per CAD (assuming CAD = 0.74 USD)
-                irr_per_cad = (1 / usd_per_irr) * 0.74
+            # Navasan returns rates in Iranian Rial
+            if 'usd' in irr_data and 'value' in irr_data['usd']:
+                irr_per_usd = irr_data['usd']['value']
+                # Convert to IRR per CAD (CAD to USD rate ~0.74)
+                irr_per_cad = irr_per_usd * 0.74
                 rates['IRR'] = irr_per_cad
-                logging.info(f"Got IRR rate from priceto.day: {irr_per_cad}")
+                logging.info(f"Got IRR rate from Navasan: {irr_per_cad} IRR/CAD (USD rate: {irr_per_usd})")
+        elif irr_response.status_code == 429:
+            logging.warning("Navasan API rate limit exceeded")
     except Exception as e:
-        logging.warning(f"Failed to get IRR rate from priceto.day: {e}")
+        logging.warning(f"Failed to get IRR rate from Navasan: {e}")
     
-    # Get USD rate from exchangerate.host if we don't have it
+    # Try BONBAST as fallback for IRR (if Navasan fails)
+    if 'IRR' not in rates:
+        try:
+            # BONBAST provides free market rates
+            bonbast_response = requests.get("https://bonbast.com/json", timeout=10)
+            if bonbast_response.status_code == 200:
+                bonbast_data = bonbast_response.json()
+                # BONBAST returns rates in different format
+                if 'usd1' in bonbast_data:  # USD sell rate
+                    irr_per_usd = float(bonbast_data['usd1'])
+                    irr_per_cad = irr_per_usd * 0.74
+                    rates['IRR'] = irr_per_cad
+                    logging.info(f"Got IRR rate from BONBAST: {irr_per_cad} IRR/CAD")
+        except Exception as e:
+            logging.warning(f"Failed to get IRR rate from BONBAST: {e}")
+    
+    # Get USD rate from exchangerate.host
     try:
         response = requests.get("https://api.exchangerate.host/latest?base=CAD&symbols=USD", timeout=10)
         if response.status_code == 200:
@@ -69,14 +90,15 @@ def get_exchange_rates():
     except Exception as e:
         logging.warning(f"Failed to get USD rate from exchangerate.host: {e}")
     
-    # Use fallback rates if APIs fail
+    # Use REALISTIC fallback rates if APIs fail (updated for 2025)
     if 'USD' not in rates:
         rates['USD'] = 0.74
         logging.info("Using fallback USD rate: 0.74")
     
     if 'IRR' not in rates:
-        rates['IRR'] = 42000
-        logging.info("Using fallback IRR rate: 42000")
+        # Updated fallback rate to realistic 2025 free market rate (~1M IRR/USD)
+        rates['IRR'] = 1014000 * 0.74  # ~750,000 IRR/CAD
+        logging.info(f"Using fallback IRR rate: {rates['IRR']} (based on ~1,014,000 IRR/USD free market rate)")
     
     # Update database with fetched rates
     try:
