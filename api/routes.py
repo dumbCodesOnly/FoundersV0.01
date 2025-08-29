@@ -283,6 +283,43 @@ def toggle_whitelist(user_id, action):
     db.session.commit()
     return redirect(url_for('admin'))
 
+@app.route('/admin/reset-database', methods=['POST'])
+def reset_database():
+    """Bot owner only - Reset/clear all database data while preserving structure"""
+    # Only allow actual bot owner to reset database
+    if 'telegram_id' not in session or session.get('telegram_id') != app.config['BOT_OWNER_ID']:
+        flash('Bot owner access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    confirm_code = request.form.get('confirm_code')
+    if confirm_code != 'RESET_ALL_DATA':
+        flash('Invalid confirmation code. Database reset cancelled.', 'error')
+        return redirect(url_for('admin'))
+    
+    try:
+        # Clear all data tables (but preserve structure)
+        from .models import Purchase, Sale, ExchangeRate, User
+        
+        # Delete all purchases and sales
+        Purchase.query.delete()
+        Sale.query.delete()
+        ExchangeRate.query.delete()
+        
+        # Delete all users except the bot owner
+        User.query.filter(User.telegram_id != app.config['BOT_OWNER_ID']).delete()
+        
+        db.session.commit()
+        
+        logging.info(f"Database reset performed by bot owner: {session.get('telegram_id')}")
+        flash('Database successfully reset. All transaction data cleared, user data cleared (except bot owner).', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Database reset failed: {e}")
+        flash('Database reset failed. Please check logs for details.', 'error')
+    
+    return redirect(url_for('admin'))
+
 @app.route('/api/exchange-rates')
 def api_exchange_rates():
     """API endpoint for live exchange rates"""
