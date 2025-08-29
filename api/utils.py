@@ -36,35 +36,101 @@ def get_exchange_rates():
     rates = {}
     usd_to_irr_rate = None
     
-    # Try free market IRR rate from PriceToDay API (free, reliable)
+    # Try TGJU for direct CAD to IRR free market rates (most accurate)
     try:
-        # PriceToDay provides free market rates
-        priceto_url = "https://api.priceto.day/v1/latest/irr/usd"
+        tgju_url = "https://www.tgju.org/profile/price_cad"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         }
         
-        irr_response = requests.get(priceto_url, headers=headers, timeout=10)
-        if irr_response.status_code == 200:
-            irr_data = irr_response.json()
-            # PriceToDay returns rates in format: {"usd": {"rate": 1014000}}
-            if 'usd' in irr_data and 'rate' in irr_data['usd']:
-                irr_per_usd = float(irr_data['usd']['rate'])
-                # Validate that it's a realistic free market rate (should be > 500,000)
-                if irr_per_usd > 500000:
-                    usd_to_irr_rate = irr_per_usd
-                    # Convert to IRR per CAD (CAD to USD rate ~0.74)
-                    irr_per_cad = irr_per_usd * 0.74
-                    rates['IRR'] = irr_per_cad
-                    rates['USD_to_IRR'] = irr_per_usd
-                    logging.info(f"Got free market IRR rate from PriceToDay: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
-                else:
-                    logging.warning(f"PriceToDay returned unrealistic rate: {irr_per_usd} IRR/USD (seems like official rate, not free market)")
+        cad_response = requests.get(tgju_url, headers=headers, timeout=15)
+        if cad_response.status_code == 200:
+            response_text = cad_response.text
+            # Parse CAD rate from HTML content - look for "نرخ فعلی" (Current Rate)
+            import re
+            
+            # Look for CAD rate pattern - try multiple approaches
+            cad_rate = None
+            
+            # Pattern 1: Look for table row with "نرخ فعلی" and extract number
+            table_pattern = r'<td[^>]*>نرخ فعلی</td>\s*<td[^>]*>([0-9,]+)</td>'
+            match = re.search(table_pattern, response_text)
+            
+            if match:
+                cad_rate_str = match.group(1).replace(',', '')
+                cad_rate = float(cad_rate_str)
+            else:
+                # Pattern 2: Look for span or div containing the rate number near "نرخ فعلی"
+                # Try to find any 6-digit number with commas (typical IRR format)
+                rate_patterns = [
+                    r'(?:نرخ فعلی|Current Rate)[:\s]*.*?([0-9]{3,4},[0-9]{3})',
+                    r'<[^>]*>([0-9]{3,4},[0-9]{3})</[^>]*>',
+                    r'([0-9]{3,4},[0-9]{3})'  # Generic 6-digit number pattern
+                ]
+                
+                for pattern in rate_patterns:
+                    matches = re.findall(pattern, response_text)
+                    if matches:
+                        # Look for rates in realistic range (400k-800k for CAD)
+                        for match_str in matches:
+                            test_rate = float(match_str.replace(',', ''))
+                            if 400000 <= test_rate <= 900000:
+                                cad_rate = test_rate
+                                logging.info(f"Found CAD rate using pattern '{pattern}': {cad_rate}")
+                                break
+                    if cad_rate:
+                        break
+            
+            # Validate and use the rate if found
+            if cad_rate and cad_rate > 400000:
+                rates['IRR'] = cad_rate
+                logging.info(f"Got CAD to IRR rate from TGJU: {cad_rate} IRR/CAD")
+                
+                # Calculate USD to IRR rate from CAD rate (CAD to USD ~0.74)
+                if 'USD_to_IRR' not in rates:
+                    usd_rate = cad_rate / 0.74  # Convert CAD/IRR to USD/IRR
+                    usd_to_irr_rate = usd_rate
+                    rates['USD_to_IRR'] = usd_rate
+                    logging.info(f"Calculated USD to IRR rate from TGJU CAD rate: {usd_rate} IRR/USD")
+            elif cad_rate:
+                logging.warning(f"TGJU returned unrealistic CAD rate: {cad_rate} IRR/CAD")
+            else:
+                logging.warning("Could not parse CAD rate from TGJU website")
     except Exception as e:
-        logging.warning(f"Failed to get IRR rate from PriceToDay: {e}")
+        logging.warning(f"Failed to get CAD rate from TGJU: {e}")
 
-    # Try BONBAST as fallback for IRR (if PriceToDay fails)
+    # Try free market IRR rate from PriceToDay API as fallback (if TGJU fails)
+    if 'USD_to_IRR' not in rates:
+        try:
+            # PriceToDay provides free market rates
+            priceto_url = "https://api.priceto.day/v1/latest/irr/usd"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+            }
+            
+            irr_response = requests.get(priceto_url, headers=headers, timeout=10)
+            if irr_response.status_code == 200:
+                irr_data = irr_response.json()
+                # PriceToDay returns rates in format: {"usd": {"rate": 1014000}}
+                if 'usd' in irr_data and 'rate' in irr_data['usd']:
+                    irr_per_usd = float(irr_data['usd']['rate'])
+                    # Validate that it's a realistic free market rate (should be > 500,000)
+                    if irr_per_usd > 500000:
+                        usd_to_irr_rate = irr_per_usd
+                        rates['USD_to_IRR'] = irr_per_usd
+                        # Only set CAD rate if not already set from TGJU
+                        if 'IRR' not in rates:
+                            irr_per_cad = irr_per_usd * 0.74
+                            rates['IRR'] = irr_per_cad
+                        logging.info(f"Got USD to IRR rate from PriceToDay: {irr_per_usd} IRR/USD")
+                    else:
+                        logging.warning(f"PriceToDay returned unrealistic rate: {irr_per_usd} IRR/USD (seems like official rate, not free market)")
+        except Exception as e:
+            logging.warning(f"Failed to get IRR rate from PriceToDay: {e}")
+
+    # Try BONBAST as fallback for IRR (if TGJU and PriceToDay both fail)
     if 'IRR' not in rates or 'USD_to_IRR' not in rates:
         try:
             # BONBAST provides free market rates
