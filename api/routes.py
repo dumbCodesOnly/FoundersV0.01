@@ -320,6 +320,44 @@ def reset_database():
     
     return redirect(url_for('admin'))
 
+@app.route('/admin/reset-transactions', methods=['POST'])
+def reset_transactions():
+    """Bot owner only - Reset/clear only transaction data (purchases, sales) while keeping users"""
+    # Only allow actual bot owner to reset transactions
+    if 'telegram_id' not in session or session.get('telegram_id') != app.config['BOT_OWNER_ID']:
+        flash('Bot owner access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    confirm_code = request.form.get('confirm_code')
+    if confirm_code != 'RESET_TRANSACTIONS':
+        flash('Invalid confirmation code. Transaction reset cancelled.', 'error')
+        return redirect(url_for('admin'))
+    
+    try:
+        # Clear only transaction data (but preserve structure and users)
+        from .models import Purchase, Sale, ExchangeRate
+        
+        # Delete all purchases and sales only
+        purchases_count = Purchase.query.count()
+        sales_count = Sale.query.count()
+        exchange_rates_count = ExchangeRate.query.count()
+        
+        Purchase.query.delete()
+        Sale.query.delete()
+        ExchangeRate.query.delete()
+        
+        db.session.commit()
+        
+        logging.info(f"Transaction reset performed by bot owner: {session.get('telegram_id')} - Deleted {purchases_count} purchases, {sales_count} sales, {exchange_rates_count} exchange rates")
+        flash(f'Transactions successfully reset. Deleted {purchases_count} purchases, {sales_count} sales, and {exchange_rates_count} exchange rates. All users preserved.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Transaction reset failed: {e}")
+        flash('Transaction reset failed. Please check logs for details.', 'error')
+    
+    return redirect(url_for('admin'))
+
 @app.route('/api/exchange-rates')
 def api_exchange_rates():
     """API endpoint for live exchange rates"""
