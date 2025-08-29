@@ -100,6 +100,13 @@ else:
 # Disable SQLAlchemy modifications tracking to save memory
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Configure session for better authentication caching
+from datetime import timedelta
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # 30 days for better caching
+app.config['SESSION_COOKIE_SECURE'] = environment in ['vercel', 'production']  # Use HTTPS only in production
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS attacks
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection while allowing Telegram WebApp
+
 # Initialize the app with the extension
 logging.debug("Initializing SQLAlchemy with Flask app...")
 try:

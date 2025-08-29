@@ -67,21 +67,41 @@ document.addEventListener('DOMContentLoaded', function() {
         const user = tg.initDataUnsafe?.user;
         
         if (user) {
-            // Send authentication request
-            fetch('/auth/telegram', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    user: user,
-                    auth_date: tg.initDataUnsafe?.auth_date,
-                    hash: tg.initDataUnsafe?.hash
-                })
-            })
+            // First, check if we have a cached authentication
+            fetch('/auth/status')
             .then(response => response.json())
+            .then(statusData => {
+                if (statusData.authenticated && statusData.telegram_id === user.id) {
+                    // User is already authenticated with cached session
+                    console.log('Using cached authentication session');
+                    window.location.href = '/dashboard';
+                    return;
+                }
+                
+                // Proceed with full authentication
+                return fetch('/auth/telegram', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user: user,
+                        auth_date: tg.initDataUnsafe?.auth_date,
+                        hash: tg.initDataUnsafe?.hash
+                    })
+                });
+            })
+            .then(response => {
+                if (!response) return; // Already handled cached auth above
+                return response.json();
+            })
             .then(data => {
+                if (!data) return; // Already handled cached auth above
+                
                 if (data.success) {
+                    if (data.cached) {
+                        console.log('Fast authentication using session cache');
+                    }
                     window.location.href = data.redirect;
                 } else if (data.error && data.error.includes('Access denied')) {
                     document.getElementById('login-status').classList.add('hidden');

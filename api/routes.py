@@ -30,11 +30,32 @@ def index():
 
 @app.route('/login')
 def login():
+    # Check if user is already authenticated in session
+    if 'user_id' in session and 'telegram_id' in session and 'cached_user_data' in session:
+        # Quick session validation
+        user = User.query.get(session['user_id'])
+        if (user and user.telegram_id == session['telegram_id'] and 
+            (user.is_whitelisted or user.telegram_id == app.config.get('BOT_OWNER_ID'))):
+            logging.info(f"User {session['telegram_id']} already authenticated, redirecting to dashboard")
+            return redirect(url_for('dashboard'))
+    
     return render_template('login.html')
+
+@app.route('/auth/status')
+def auth_status():
+    """Check authentication status for faster login"""
+    if ('user_id' in session and 'telegram_id' in session and 'cached_user_data' in session):
+        return jsonify({
+            'authenticated': True,
+            'user_id': session['user_id'],
+            'telegram_id': session['telegram_id'],
+            'cached_data': session['cached_user_data']
+        })
+    return jsonify({'authenticated': False})
 
 @app.route('/auth/telegram', methods=['POST'])
 def telegram_auth():
-    """Handle Telegram WebApp authentication"""
+    """Handle Telegram WebApp authentication with session caching"""
     try:
         data = request.get_json()
         
@@ -47,7 +68,26 @@ def telegram_auth():
         if not telegram_id:
             return jsonify({'error': 'Missing user ID'}), 400
         
-        # Check if user exists
+        # Check if user is already cached in session
+        if ('user_id' in session and 
+            'telegram_id' in session and 
+            session.get('telegram_id') == telegram_id and
+            'cached_user_data' in session):
+            
+            # Verify cached session is still valid (user exists and is whitelisted)
+            cached_user = User.query.get(session['user_id'])
+            if (cached_user and 
+                cached_user.telegram_id == telegram_id and 
+                (cached_user.is_whitelisted or cached_user.telegram_id == app.config.get('BOT_OWNER_ID'))):
+                
+                # Update last login without full database operations
+                cached_user.last_login = datetime.utcnow()
+                db.session.commit()
+                
+                logging.info(f"Using cached session for user {telegram_id}")
+                return jsonify({'success': True, 'redirect': url_for('dashboard'), 'cached': True})
+        
+        # Full authentication flow for new/invalid sessions
         user = User.query.filter_by(telegram_id=telegram_id).first()
         
         if not user:
@@ -60,7 +100,7 @@ def telegram_auth():
             user.photo_url = user_data.get('photo_url', '')
             
             # Auto-whitelist and grant admin privileges to bot owner
-            if telegram_id == app.config['BOT_OWNER_ID']:
+            if telegram_id == app.config.get('BOT_OWNER_ID'):
                 user.is_whitelisted = True
                 user.is_admin = True
                 logging.info(f"Auto-whitelisted bot owner: {telegram_id}")
@@ -77,7 +117,7 @@ def telegram_auth():
             user.photo_url = user_data.get('photo_url', user.photo_url)
             
             # Ensure bot owner always has admin privileges and is whitelisted
-            if telegram_id == app.config['BOT_OWNER_ID']:
+            if telegram_id == app.config.get('BOT_OWNER_ID'):
                 if not user.is_whitelisted or not user.is_admin:
                     user.is_whitelisted = True
                     user.is_admin = True
@@ -87,14 +127,25 @@ def telegram_auth():
         db.session.commit()
         
         # Check if user is whitelisted
-        if not user.is_whitelisted and user.telegram_id != app.config['BOT_OWNER_ID']:
+        if not user.is_whitelisted and user.telegram_id != app.config.get('BOT_OWNER_ID'):
             return jsonify({'error': 'Access denied. You are not authorized to use this application.'}), 403
         
-        # Set session
+        # Set session with cached user data
         session['user_id'] = user.id
         session['telegram_id'] = user.telegram_id
-        session['is_admin'] = user.is_admin or user.telegram_id == app.config['BOT_OWNER_ID']
+        session['is_admin'] = user.is_admin or user.telegram_id == app.config.get('BOT_OWNER_ID')
+        session['cached_user_data'] = {
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'username': user.username,
+            'photo_url': user.photo_url,
+            'is_whitelisted': user.is_whitelisted,
+            'is_admin': user.is_admin,
+            'cached_at': datetime.utcnow().isoformat()
+        }
+        session.permanent = True  # Make session persistent
         
+        logging.info(f"Full authentication completed for user {telegram_id}")
         return jsonify({'success': True, 'redirect': url_for('dashboard')})
         
     except Exception as e:
