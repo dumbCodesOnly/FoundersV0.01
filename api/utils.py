@@ -1,8 +1,8 @@
 import requests
 import logging
 from datetime import datetime
-from models import ExchangeRate, Purchase, Sale
-from app import db
+from .models import ExchangeRate, Purchase, Sale
+from .app import db
 
 def format_gold_quantity(amount):
     """Format gold quantity in k format (1k, 2k, 1.5k, etc.)"""

@@ -3,9 +3,9 @@ from datetime import datetime, date
 import json
 import logging
 import traceback
-from app import app, db
-from models import User, Purchase, Sale, ExchangeRate
-from utils import get_exchange_rates, calculate_inventory_and_profit, convert_currency
+from .app import app, db
+from .models import User, Purchase, Sale, ExchangeRate
+from .utils import get_exchange_rates, calculate_inventory_and_profit, convert_currency
 
 # Configure route logging
 logger = logging.getLogger(__name__)

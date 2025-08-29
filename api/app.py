@@ -83,7 +83,7 @@ def init_database():
     """Initialize database tables and create default admin user"""
     try:
         # Import models to ensure tables are created
-        import models
+        from . import models
         logging.info("Models imported successfully")
         
         # Create all tables
@@ -141,7 +141,7 @@ def create_app():
     
     try:
         # Import utils for template functions first
-        from utils import format_gold_quantity
+        from .utils import format_gold_quantity
         
         # Make format function available in templates
         app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
@@ -160,7 +160,7 @@ def create_app():
                 init_database()
             
             # Import routes after database initialization
-            import routes
+            from . import routes
             logging.info("Routes imported successfully")
         
         return app
@@ -171,14 +171,14 @@ def create_app():
         
         # Fallback - still register template function and import routes
         try:
-            from utils import format_gold_quantity
+            from .utils import format_gold_quantity
             app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
             logging.info("Template functions registered in fallback mode")
         except Exception as template_error:
             logging.error(f"Template function registration failed: {template_error}")
         
         try:
-            import routes
+            from . import routes
             logging.info("Routes imported in fallback mode")
         except Exception as route_error:
             logging.error(f"Route import failed: {route_error}")
@@ -187,7 +187,7 @@ def create_app():
 
 # Register template functions globally before app initialization
 try:
-    from utils import format_gold_quantity
+    from .utils import format_gold_quantity
     app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
     logging.info("Template functions registered successfully")
 except Exception as e:
