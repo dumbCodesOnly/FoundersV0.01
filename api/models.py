@@ -3,6 +3,8 @@ from .app import db
 from sqlalchemy import func
 
 class User(db.Model):
+    __tablename__ = 'user'
+    
     id = db.Column(db.Integer, primary_key=True)
     telegram_id = db.Column(db.BigInteger, unique=True, nullable=False)
     first_name = db.Column(db.String(100), nullable=False)
@@ -14,10 +16,6 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     
-    # Relationships
-    purchases = db.relationship('Purchase', backref='creator', lazy=True)
-    sales = db.relationship('Sale', backref='creator', lazy=True)
-    
     def __repr__(self):
         return f'<User {self.telegram_id}: {self.first_name}>'
     
@@ -28,6 +26,7 @@ class User(db.Model):
         return self.first_name
 
 class Purchase(db.Model):
+    __tablename__ = 'purchase'
     id = db.Column(db.Integer, primary_key=True)
     seller = db.Column(db.String(200), nullable=False)
     date = db.Column(db.Date, nullable=False)
@@ -42,6 +41,7 @@ class Purchase(db.Model):
         return f'<Purchase {self.id}: {self.gold_amount}g @ {self.unit_price} {self.currency}>'
 
 class Sale(db.Model):
+    __tablename__ = 'sale'
     id = db.Column(db.Integer, primary_key=True)
     gold_amount = db.Column(db.Float, nullable=False)  # in grams
     unit_price = db.Column(db.Float, nullable=False)   # price per gram in CAD
@@ -54,6 +54,7 @@ class Sale(db.Model):
         return f'<Sale {self.id}: {self.gold_amount}g @ {self.unit_price} CAD>'
 
 class ExchangeRate(db.Model):
+    __tablename__ = 'exchangerate'
     id = db.Column(db.Integer, primary_key=True)
     from_currency = db.Column(db.String(3), nullable=False)
     to_currency = db.Column(db.String(3), nullable=False)
@@ -62,3 +63,6 @@ class ExchangeRate(db.Model):
     
     def __repr__(self):
         return f'<ExchangeRate {self.from_currency}/{self.to_currency}: {self.rate}>'
+
+# Note: Relationships temporarily removed to resolve Vercel deployment issues
+# Can be added back once the core deployment issue is resolved

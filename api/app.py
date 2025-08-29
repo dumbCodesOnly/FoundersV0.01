@@ -106,9 +106,6 @@ db.init_app(app)
 # Import models here to avoid circular imports
 with app.app_context():
     from . import models
-    
-# Import routes after models to avoid circular imports
-from . import routes
 
 # App configuration using environment variables
 app.config.update(
@@ -196,6 +193,10 @@ def create_app():
                     pass
             else:
                 init_database()
+            
+            # Import routes after database initialization to avoid circular imports
+            from . import routes
+            logging.info("Routes imported successfully")
         
         return app
         
