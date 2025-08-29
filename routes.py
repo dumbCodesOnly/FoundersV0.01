@@ -117,11 +117,12 @@ def purchase():
         try:
             seller = request.form.get('seller', '').strip()
             date_str = request.form.get('date')
-            gold_amount = float(request.form.get('gold_amount', 0))
+            gold_amount_k = float(request.form.get('gold_amount', 0))
+            gold_amount = gold_amount_k * 1000  # Convert k format to actual amount
             unit_price = float(request.form.get('unit_price', 0))
             currency = request.form.get('currency', 'CAD')
             
-            if not all([seller, date_str, gold_amount > 0, unit_price > 0]):
+            if not all([seller, date_str, gold_amount_k > 0, unit_price > 0]):
                 flash('All fields are required and amounts must be positive', 'error')
                 return render_template('purchase.html', user=user)
             
@@ -130,7 +131,7 @@ def purchase():
                 return render_template('purchase.html', user=user)
                 
             purchase_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            total_cost = gold_amount * unit_price
+            total_cost = gold_amount_k * unit_price  # Calculate cost based on k amount and price per k
             
             purchase = Purchase()
             purchase.seller = seller
@@ -144,7 +145,7 @@ def purchase():
             db.session.add(purchase)
             db.session.commit()
             
-            flash(f'Purchase recorded: {gold_amount}g from {seller}', 'success')
+            flash(f'Purchase recorded: {gold_amount_k}k gold from {seller}', 'success')
             return redirect(url_for('dashboard'))
             
         except ValueError as e:
@@ -172,16 +173,17 @@ def sale():
     
     if request.method == 'POST':
         try:
-            gold_amount = float(request.form.get('gold_amount', 0))
+            gold_amount_k = float(request.form.get('gold_amount', 0))
+            gold_amount = gold_amount_k * 1000  # Convert k format to actual amount
             unit_price = float(request.form.get('unit_price', 0))
             date_str = request.form.get('date')
             
-            if not all([gold_amount > 0, unit_price > 0, date_str]):
+            if not all([gold_amount_k > 0, unit_price > 0, date_str]):
                 flash('All fields are required and amounts must be positive', 'error')
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
             
             if gold_amount > available_inventory:
-                flash(f'Cannot sell {gold_amount}g. Only {available_inventory:.2f}g available.', 'error')
+                flash(f'Cannot sell {gold_amount_k}k gold. Only {available_inventory/1000:.1f}k available.', 'error')
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
             
             if not date_str:
@@ -189,7 +191,7 @@ def sale():
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
                 
             sale_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            total_revenue = gold_amount * unit_price
+            total_revenue = gold_amount_k * unit_price  # Calculate revenue based on k amount and price per k
             
             sale = Sale()
             sale.gold_amount = gold_amount
@@ -201,7 +203,7 @@ def sale():
             db.session.add(sale)
             db.session.commit()
             
-            flash(f'Sale recorded: {gold_amount}g for ${total_revenue:.2f} CAD', 'success')
+            flash(f'Sale recorded: {gold_amount_k}k gold for ${total_revenue:.2f} CAD', 'success')
             return redirect(url_for('dashboard'))
             
         except ValueError as e:
