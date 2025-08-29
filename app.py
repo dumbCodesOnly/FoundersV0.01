@@ -82,8 +82,27 @@ def init_database():
     except Exception as e:
         logging.error(f"Database initialization error: {e}")
 
-# Initialize database with proper context
-with app.app_context():
-    init_database()
-    # Import routes after database initialization
-    import routes
+# Initialize database and routes
+def create_app():
+    """Create and configure the Flask application"""
+    try:
+        with app.app_context():
+            init_database()
+            # Import routes after database initialization
+            import routes
+        return app
+    except Exception as e:
+        logging.error(f"App initialization error: {e}")
+        # Fallback - just import routes
+        import routes
+        return app
+
+# Initialize the app for both environments
+if database_url:
+    # Production environment (Vercel with DATABASE_URL)
+    logging.info("Initializing app for production (Vercel)")
+    create_app()
+else:
+    # Development environment (Replit)
+    logging.info("Initializing app for development (Replit)")
+    create_app()
