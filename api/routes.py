@@ -1,5 +1,5 @@
 from flask import render_template, request, redirect, url_for, session, flash, jsonify
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import json
 import logging
 import traceback
@@ -43,19 +43,45 @@ def login():
 
 @app.route('/auth/status')
 def auth_status():
-    """Check authentication status for faster login"""
+    """Enhanced authentication status check with cross-platform support"""
     if ('user_id' in session and 'telegram_id' in session and 'cached_user_data' in session):
-        return jsonify({
-            'authenticated': True,
-            'user_id': session['user_id'],
-            'telegram_id': session['telegram_id'],
-            'cached_data': session['cached_user_data']
-        })
-    return jsonify({'authenticated': False})
+        # Get platform info for current session
+        current_platform = session.get('platform_info', {})
+        cached_data = session.get('cached_user_data', {})
+        
+        # Enhanced session validation
+        try:
+            # Verify user still exists and is active
+            user = User.query.get(session['user_id'])
+            if not user or user.telegram_id != session['telegram_id']:
+                # Session is invalid, clear it
+                session.clear()
+                return jsonify({'authenticated': False, 'reason': 'Invalid session'})
+            
+            # Check if user is still whitelisted
+            if not user.is_whitelisted and user.telegram_id != app.config.get('BOT_OWNER_ID'):
+                session.clear()
+                return jsonify({'authenticated': False, 'reason': 'Access revoked'})
+            
+            return jsonify({
+                'authenticated': True,
+                'user_id': session['user_id'],
+                'telegram_id': session['telegram_id'],
+                'cached_data': cached_data,
+                'platform_info': current_platform,
+                'session_age': (datetime.utcnow() - datetime.fromisoformat(cached_data.get('cached_at', datetime.utcnow().isoformat()))).total_seconds() / 3600 if cached_data.get('cached_at') else 0
+            })
+            
+        except Exception as e:
+            logging.error(f"Session validation error: {e}")
+            session.clear()
+            return jsonify({'authenticated': False, 'reason': 'Session validation failed'})
+    
+    return jsonify({'authenticated': False, 'reason': 'No active session'})
 
 @app.route('/auth/telegram', methods=['POST'])
 def telegram_auth():
-    """Handle Telegram WebApp authentication with session caching"""
+    """Handle Telegram WebApp authentication with cross-platform support and session caching"""
     try:
         data = request.get_json()
         
@@ -64,15 +90,47 @@ def telegram_auth():
         
         user_data = data['user']
         telegram_id = user_data.get('id')
+        platform_info = data.get('platform_info', {})
         
         if not telegram_id:
             return jsonify({'error': 'Missing user ID'}), 400
         
-        # Check if user is already cached in session
+        # Log platform information for debugging
+        logging.info(f"Authentication attempt from Telegram ID {telegram_id} on platform: {platform_info.get('platform', 'unknown')}")
+        logging.debug(f"Platform details: {platform_info}")
+        
+        # Enhanced platform validation
+        is_mobile = platform_info.get('is_mobile', False)
+        is_desktop = platform_info.get('is_desktop', False)
+        platform_name = platform_info.get('platform', 'unknown')
+        
+        # Platform-specific validation and handling
+        if not (is_mobile or is_desktop) and platform_name == 'unknown':
+            logging.warning(f"Authentication from unknown platform for user {telegram_id}")
+        elif is_desktop:
+            logging.info(f"Desktop Telegram authentication for user {telegram_id}")
+        elif is_mobile:
+            logging.info(f"Mobile Telegram authentication for user {telegram_id}")
+        
+        # Check if user is already cached in session (with platform consistency)
         if ('user_id' in session and 
             'telegram_id' in session and 
             session.get('telegram_id') == telegram_id and
             'cached_user_data' in session):
+            
+            # Check if platform has changed significantly (mobile <-> desktop switch)
+            cached_platform = session.get('platform_info', {})
+            platform_changed = (
+                cached_platform.get('platform') != platform_name and 
+                cached_platform.get('is_mobile') != is_mobile and
+                cached_platform.get('is_desktop') != is_desktop
+            )
+            
+            if platform_changed:
+                logging.info(f"Platform changed for user {telegram_id}: {cached_platform.get('platform')} -> {platform_name}")
+                # Update platform info in session
+                session['platform_info'] = platform_info
+                session['cached_user_data']['platform'] = platform_name
             
             # Verify cached session is still valid (user exists and is whitelisted)
             cached_user = User.query.get(session['user_id'])
@@ -84,7 +142,7 @@ def telegram_auth():
                 cached_user.last_login = datetime.utcnow()
                 db.session.commit()
                 
-                logging.info(f"Using cached session for user {telegram_id}")
+                logging.info(f"Using cached session for user {telegram_id} on {platform_name}")
                 return jsonify({'success': True, 'redirect': url_for('dashboard'), 'cached': True})
         
         # Full authentication flow for new/invalid sessions
@@ -130,10 +188,11 @@ def telegram_auth():
         if not user.is_whitelisted and user.telegram_id != app.config.get('BOT_OWNER_ID'):
             return jsonify({'error': 'Access denied. You are not authorized to use this application.'}), 403
         
-        # Set session with cached user data
+        # Set session with cached user data and platform information
         session['user_id'] = user.id
         session['telegram_id'] = user.telegram_id
         session['is_admin'] = user.is_admin or user.telegram_id == app.config.get('BOT_OWNER_ID')
+        session['platform_info'] = platform_info  # Store platform info for session consistency
         session['cached_user_data'] = {
             'first_name': user.first_name,
             'last_name': user.last_name,
@@ -141,16 +200,61 @@ def telegram_auth():
             'photo_url': user.photo_url,
             'is_whitelisted': user.is_whitelisted,
             'is_admin': user.is_admin,
-            'cached_at': datetime.utcnow().isoformat()
+            'cached_at': datetime.utcnow().isoformat(),
+            'platform': platform_info.get('platform', 'unknown')
         }
         session.permanent = True  # Make session persistent
         
-        logging.info(f"Full authentication completed for user {telegram_id}")
+        # Enhanced session timeout for cross-platform consistency
+        app.permanent_session_lifetime = timedelta(days=30)  # Longer session for better UX
+        
+        logging.info(f"Full authentication completed for user {telegram_id} on {platform_name}")
         return jsonify({'success': True, 'redirect': url_for('dashboard')})
         
     except Exception as e:
         logging.error(f"Telegram auth error: {e}")
-        return jsonify({'error': 'Authentication failed'}), 500
+        
+        # Platform-specific error messages
+        error_message = 'Authentication failed'
+        if platform_info.get('is_desktop'):
+            error_message = 'Desktop Telegram authentication failed. Please try refreshing the app or reopening from Telegram.'
+        elif platform_info.get('is_mobile'):
+            error_message = 'Mobile Telegram authentication failed. Please ensure you opened this through the Telegram app.'
+        
+        return jsonify({'error': error_message}), 500
+
+@app.route('/auth/debug')
+def auth_debug():
+    """Debug endpoint for troubleshooting cross-platform authentication issues"""
+    if not app.debug:
+        return jsonify({'error': 'Debug endpoint only available in debug mode'}), 403
+    
+    debug_info = {
+        'session_data': {
+            'has_user_id': 'user_id' in session,
+            'has_telegram_id': 'telegram_id' in session,
+            'has_cached_data': 'cached_user_data' in session,
+            'has_platform_info': 'platform_info' in session,
+            'session_keys': list(session.keys())
+        },
+        'platform_info': session.get('platform_info', {}),
+        'cached_user_data': session.get('cached_user_data', {}),
+        'user_agent': request.headers.get('User-Agent', 'Unknown')
+    }
+    
+    if 'user_id' in session:
+        try:
+            user = User.query.get(session['user_id'])
+            debug_info['database_user'] = {
+                'exists': user is not None,
+                'telegram_id': user.telegram_id if user else None,
+                'is_whitelisted': user.is_whitelisted if user else None,
+                'last_login': user.last_login.isoformat() if user and user.last_login else None
+            }
+        except Exception as e:
+            debug_info['database_error'] = str(e)
+    
+    return jsonify(debug_info)
 
 @app.route('/logout')
 def logout():

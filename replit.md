@@ -14,9 +14,11 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Flask sessions with configurable secret keys for security
 
 ## Authentication System
-- **Telegram WebApp Integration**: Primary authentication method using Telegram's WebApp API
+- **Cross-Platform Telegram Integration**: Enhanced authentication supporting both mobile and desktop Telegram clients
+- **Platform Detection**: Automatic detection of mobile vs desktop clients with appropriate handling
+- **Session Consistency**: Cross-platform session management ensuring seamless user experience when switching between devices
 - **User Management**: Role-based access control with whitelisting and admin privileges
-- **Session-based Auth**: Server-side session management for authenticated users
+- **Enhanced Session Caching**: Extended session lifetime (30 days) with platform-aware session validation
 
 ## Data Models
 - **User Model**: Stores Telegram user data, authentication status, and role permissions

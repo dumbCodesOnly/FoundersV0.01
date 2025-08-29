@@ -58,72 +58,89 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Telegram WebApp
-    if (window.Telegram && window.Telegram.WebApp) {
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        
-        // Get user data
-        const user = tg.initDataUnsafe?.user;
-        
-        if (user) {
-            // First, check if we have a cached authentication
-            fetch('/auth/status')
-            .then(response => response.json())
-            .then(statusData => {
-                if (statusData.authenticated && statusData.telegram_id === user.id) {
-                    // User is already authenticated with cached session
+    // Enhanced cross-platform authentication
+    async function performAuthentication() {
+        try {
+            // Wait for Telegram WebApp to initialize
+            if (!window.telegramWebApp) {
+                throw new Error('Telegram WebApp not initialized');
+            }
+            
+            const webApp = window.telegramWebApp;
+            
+            // Show debug info in console
+            console.log('Debug info:', webApp.getDebugInfo());
+            
+            // Check if authentication is available
+            if (!webApp.isAuthenticationAvailable()) {
+                throw new Error('Authentication data not available');
+            }
+            
+            // Check cached authentication first
+            try {
+                const statusResponse = await fetch('/auth/status');
+                const statusData = await statusResponse.json();
+                
+                if (statusData.authenticated && statusData.telegram_id === webApp.user.id) {
                     console.log('Using cached authentication session');
                     window.location.href = '/dashboard';
                     return;
                 }
-                
-                // Proceed with full authentication
-                return fetch('/auth/telegram', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        user: user,
-                        auth_date: tg.initDataUnsafe?.auth_date,
-                        hash: tg.initDataUnsafe?.hash
-                    })
-                });
-            })
-            .then(response => {
-                if (!response) return; // Already handled cached auth above
-                return response.json();
-            })
-            .then(data => {
-                if (!data) return; // Already handled cached auth above
-                
-                if (data.success) {
-                    if (data.cached) {
-                        console.log('Fast authentication using session cache');
-                    }
-                    window.location.href = data.redirect;
-                } else if (data.error && data.error.includes('Access denied')) {
-                    document.getElementById('login-status').classList.add('hidden');
-                    document.getElementById('access-denied').classList.remove('hidden');
+            } catch (e) {
+                console.log('No cached session available, proceeding with fresh auth');
+            }
+            
+            // Perform authentication with platform support
+            const authResult = await webApp.authenticate();
+            
+            if (authResult.success) {
+                if (authResult.cached) {
+                    console.log('Fast authentication using session cache');
                 } else {
-                    throw new Error(data.error || 'Authentication failed');
+                    console.log('Full authentication completed for platform:', webApp.platform.platform);
                 }
-            })
-            .catch(error => {
-                console.error('Auth error:', error);
+                window.location.href = authResult.redirect;
+            } else if (authResult.error && authResult.error.includes('Access denied')) {
                 document.getElementById('login-status').classList.add('hidden');
-                document.getElementById('login-error').classList.remove('hidden');
-            });
-        } else {
-            // No user data available
-            setTimeout(() => {
-                document.getElementById('login-status').classList.add('hidden');
-                document.getElementById('login-error').classList.remove('hidden');
-            }, 2000);
+                document.getElementById('access-denied').classList.remove('hidden');
+            } else {
+                throw new Error(authResult.error || 'Authentication failed');
+            }
+            
+        } catch (error) {
+            console.error('Authentication error:', error);
+            
+            // Show detailed error info for debugging
+            if (window.telegramWebApp) {
+                console.error('Telegram WebApp debug info:', window.telegramWebApp.getDebugInfo());
+            }
+            
+            document.getElementById('login-status').classList.add('hidden');
+            document.getElementById('login-error').classList.remove('hidden');
+            
+            // Add platform-specific error message
+            const errorElement = document.querySelector('#login-error span');
+            if (errorElement && window.telegramWebApp) {
+                const platform = window.telegramWebApp.platform;
+                if (platform.isDesktop) {
+                    errorElement.textContent = 'Desktop Telegram authentication issue. Please try refreshing or reopening the app.';
+                } else if (platform.isMobile) {
+                    errorElement.textContent = 'Mobile Telegram authentication issue. Please ensure you opened this from Telegram app.';
+                } else {
+                    errorElement.textContent = 'Telegram authentication failed. Please open this app through Telegram.';
+                }
+            }
         }
+    }
+    
+    // Check if Telegram WebApp is available
+    if (window.Telegram && window.Telegram.WebApp) {
+        // Wait a moment for our enhanced WebApp class to initialize
+        setTimeout(() => {
+            performAuthentication();
+        }, 500);
     } else {
-        // Not in Telegram WebApp
+        // Not in Telegram WebApp environment
         setTimeout(() => {
             document.getElementById('login-status').classList.add('hidden');
             document.getElementById('login-error').classList.remove('hidden');
