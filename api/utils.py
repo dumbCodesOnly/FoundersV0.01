@@ -1,8 +1,6 @@
 import requests
 import logging
 from datetime import datetime
-from .models import ExchangeRate, Purchase, Sale
-from .app import db
 
 def format_gold_quantity(amount):
     """Format gold quantity in k format (1k, 2k, 1.5k, etc.)"""
@@ -31,6 +29,10 @@ def format_gold_quantity(amount):
 
 def get_exchange_rates():
     """Fetch live exchange rates from multiple sources with accurate Iranian Rial rates"""
+    # Late imports to avoid circular dependency
+    from .models import ExchangeRate
+    from .app import db
+    
     rates = {}
     
     # Try Navasan API for accurate Iranian free market rate (120 free calls/month)
@@ -130,6 +132,9 @@ def convert_currency(amount, from_currency, to_currency):
     if from_currency == to_currency:
         return amount
     
+    # Late import to avoid circular dependency
+    from .models import ExchangeRate
+    
     # Get exchange rate from database
     if from_currency == 'CAD':
         rate = ExchangeRate.query.filter_by(
@@ -160,6 +165,9 @@ def convert_currency(amount, from_currency, to_currency):
 
 def calculate_inventory_and_profit():
     """Calculate remaining inventory and profit using FIFO method"""
+    # Late imports to avoid circular dependency
+    from .models import Purchase, Sale
+    
     purchases = Purchase.query.order_by(Purchase.date, Purchase.id).all()
     sales = Sale.query.order_by(Sale.date, Sale.id).all()
     
