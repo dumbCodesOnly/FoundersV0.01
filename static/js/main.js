@@ -126,9 +126,14 @@ function clearFieldError(field) {
 
 // Notification system
 function initializeNotifications() {
-    // Auto-hide flash messages after 5 seconds
-    const flashMessages = document.querySelectorAll('[class*="bg-red-50"], [class*="bg-green-50"]');
+    // Auto-hide flash messages after 5 seconds (but not admin database sections)
+    const flashMessages = document.querySelectorAll('.flash-message, [class*="bg-red-50"]:not(.admin-section), [class*="bg-green-50"]:not(.admin-section)');
     flashMessages.forEach(message => {
+        // Skip admin database reset sections
+        if (message.querySelector('form[action*="reset"]') || message.closest('.admin-database-section')) {
+            return;
+        }
+        
         setTimeout(() => {
             if (message.parentNode) {
                 message.style.transition = 'opacity 0.5s ease-in-out';
