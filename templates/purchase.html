@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}New Purchase - Founders Management{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center mb-4">
+                <a href="{{ url_for('dashboard') }}" class="mr-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <i data-feather="arrow-left" class="w-5 h-5"></i>
+                </a>
+                <h1 class="text-2xl font-bold">Record New Purchase</h1>
+            </div>
+            <p class="text-gray-600 dark:text-gray-400">Add a new gold purchase to your inventory</p>
+        </div>
+
+        <!-- Purchase Form -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <form method="POST" class="space-y-6">
+                <!-- Seller -->
+                <div>
+                    <label for="seller" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Seller Name
+                    </label>
+                    <input type="text" 
+                           id="seller" 
+                           name="seller" 
+                           required
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                           placeholder="Enter seller name">
+                </div>
+
+                <!-- Date -->
+                <div>
+                    <label for="date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Purchase Date
+                    </label>
+                    <input type="date" 
+                           id="date" 
+                           name="date" 
+                           required
+                           value="{{ today }}"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                </div>
+
+                <!-- Gold Amount -->
+                <div>
+                    <label for="gold_amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Gold Amount (grams)
+                    </label>
+                    <input type="number" 
+                           id="gold_amount" 
+                           name="gold_amount" 
+                           step="0.01" 
+                           min="0.01"
+                           required
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                           placeholder="0.00">
+                </div>
+
+                <!-- Currency -->
+                <div>
+                    <label for="currency" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Currency
+                    </label>
+                    <select id="currency" 
+                            name="currency" 
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                        <option value="CAD">CAD (Canadian Dollar)</option>
+                        <option value="IRR">IRR (Iranian Rial)</option>
+                    </select>
+                </div>
+
+                <!-- Unit Price -->
+                <div>
+                    <label for="unit_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Unit Price (per gram)
+                    </label>
+                    <input type="number" 
+                           id="unit_price" 
+                           name="unit_price" 
+                           step="0.01" 
+                           min="0.01"
+                           required
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                           placeholder="0.00">
+                </div>
+
+                <!-- Total Cost Display -->
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Cost:</span>
+                        <span id="total-cost" class="text-lg font-bold text-telegram-blue">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex space-x-4">
+                    <button type="submit" 
+                            class="flex-1 bg-telegram-blue text-white py-2 px-4 rounded-lg hover:bg-blue-600 focus:ring-2 focus:ring-telegram-blue focus:ring-offset-2 font-medium">
+                        Record Purchase
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" 
+                       class="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 py-2 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 focus:ring-2 focus:ring-gray-300 font-medium text-center">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Creator Info -->
+        <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div class="flex items-center">
+                {% if user.photo_url %}
+                <img src="{{ user.photo_url }}" alt="{{ user.full_name }}" class="w-8 h-8 rounded-full mr-3">
+                {% else %}
+                <div class="w-8 h-8 bg-telegram-blue rounded-full flex items-center justify-center mr-3">
+                    <span class="text-white text-sm font-medium">{{ user.first_name[0] }}</span>
+                </div>
+                {% endif %}
+                <div>
+                    <p class="text-sm font-medium text-blue-800 dark:text-blue-200">Created by {{ user.full_name }}</p>
+                    <p class="text-xs text-blue-600 dark:text-blue-300">This purchase will be attributed to your account</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const goldAmountInput = document.getElementById('gold_amount');
+    const unitPriceInput = document.getElementById('unit_price');
+    const currencySelect = document.getElementById('currency');
+    const totalCostDisplay = document.getElementById('total-cost');
+
+    function updateTotalCost() {
+        const goldAmount = parseFloat(goldAmountInput.value) || 0;
+        const unitPrice = parseFloat(unitPriceInput.value) || 0;
+        const currency = currencySelect.value;
+        
+        const totalCost = goldAmount * unitPrice;
+        
+        if (currency === 'IRR') {
+            totalCostDisplay.textContent = `${totalCost.toLocaleString()} ﷼`;
+        } else {
+            totalCostDisplay.textContent = `$${totalCost.toFixed(2)} ${currency}`;
+        }
+    }
+
+    goldAmountInput.addEventListener('input', updateTotalCost);
+    unitPriceInput.addEventListener('input', updateTotalCost);
+    currencySelect.addEventListener('change', updateTotalCost);
+});
+</script>
+{% endblock %}

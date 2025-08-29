@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Founders Management{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <!-- Welcome Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold mb-2">Welcome back, {{ user.first_name }}!</h1>
+                <p class="text-gray-600 dark:text-gray-400">Gold trading dashboard and management</p>
+            </div>
+            <div class="hidden sm:flex space-x-4">
+                <a href="{{ url_for('purchase') }}" class="bg-telegram-blue text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center">
+                    <i data-feather="plus" class="w-4 h-4 mr-2"></i>
+                    New Purchase
+                </a>
+                <a href="{{ url_for('sale') }}" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                    <i data-feather="trending-up" class="w-4 h-4 mr-2"></i>
+                    New Sale
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exchange Rates -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-4 flex items-center">
+            <i data-feather="trending-up" class="w-5 h-5 mr-2 text-telegram-blue"></i>
+            Live Exchange Rates (CAD Base)
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">CAD → USD</span>
+                    <span class="text-lg font-bold text-green-600">${{ "%.4f"|format(exchange_rates.get('USD', 0.74)) }}</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">CAD → IRR</span>
+                    <span class="text-lg font-bold text-blue-600">{{ "{:,.0f}"|format(exchange_rates.get('IRR', 42000)) }} ﷼</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:col-span-2 lg:col-span-1">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">Last Updated</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400" id="exchange-update-time">Just now</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Inventory -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg flex items-center justify-center">
+                        <i data-feather="package" class="w-4 h-4 text-yellow-600 dark:text-yellow-400"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Current Inventory</p>
+                    <p class="text-2xl font-bold">{{ "%.2f"|format(stats.remaining_inventory) }}g</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">${{ "%.2f"|format(stats.remaining_inventory_value_cad) }} CAD</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Purchased -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+                        <i data-feather="shopping-cart" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Purchased</p>
+                    <p class="text-2xl font-bold">{{ "%.2f"|format(stats.total_purchased) }}g</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">${{ "%.2f"|format(stats.total_purchases_cad) }} CAD</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Sold -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
+                        <i data-feather="trending-up" class="w-4 h-4 text-green-600 dark:text-green-400"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Sold</p>
+                    <p class="text-2xl font-bold">{{ "%.2f"|format(stats.total_sold) }}g</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">${{ "%.2f"|format(stats.total_sales_cad) }} CAD</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profit -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 {{ 'bg-green-100 dark:bg-green-900/50' if stats.profit_cad >= 0 else 'bg-red-100 dark:bg-red-900/50' }} rounded-lg flex items-center justify-center">
+                        <i data-feather="{{ 'dollar-sign' if stats.profit_cad >= 0 else 'trending-down' }}" class="w-4 h-4 {{ 'text-green-600 dark:text-green-400' if stats.profit_cad >= 0 else 'text-red-600 dark:text-red-400' }}"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Profit</p>
+                    <p class="text-2xl font-bold {{ 'text-green-600 dark:text-green-400' if stats.profit_cad >= 0 else 'text-red-600 dark:text-red-400' }}">
+                        ${{ "%.2f"|format(stats.profit_cad) }} CAD
+                    </p>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 space-x-2">
+                        <span>${{ "%.2f"|format(stats.profit_usd) }} USD</span>
+                        <span>{{ "{:,.0f}"|format(stats.profit_irr) }} ﷼</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Purchases -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <i data-feather="shopping-bag" class="w-5 h-5 mr-2 text-blue-600"></i>
+                    Recent Purchases
+                </h3>
+            </div>
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% if recent_purchases %}
+                    {% for purchase in recent_purchases %}
+                    <div class="p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                {% if purchase.creator.photo_url %}
+                                <img src="{{ purchase.creator.photo_url }}" alt="{{ purchase.creator.full_name }}" class="w-8 h-8 rounded-full mr-3">
+                                {% else %}
+                                <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center mr-3">
+                                    <span class="text-blue-600 dark:text-blue-400 text-xs font-medium">{{ purchase.creator.first_name[0] }}</span>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <p class="text-sm font-medium">{{ purchase.seller }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ purchase.date.strftime('%Y-%m-%d') }} • {{ purchase.creator.full_name }}</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-semibold">{{ "%.2f"|format(purchase.gold_amount) }}g</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ "%.2f"|format(purchase.unit_price) }} {{ purchase.currency }}/g</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="p-8 text-center text-gray-500 dark:text-gray-400">
+                    <i data-feather="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                    <p>No purchases recorded yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Sales -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <i data-feather="trending-up" class="w-5 h-5 mr-2 text-green-600"></i>
+                    Recent Sales
+                </h3>
+            </div>
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% if recent_sales %}
+                    {% for sale in recent_sales %}
+                    <div class="p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                {% if sale.creator.photo_url %}
+                                <img src="{{ sale.creator.photo_url }}" alt="{{ sale.creator.full_name }}" class="w-8 h-8 rounded-full mr-3">
+                                {% else %}
+                                <div class="w-8 h-8 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mr-3">
+                                    <span class="text-green-600 dark:text-green-400 text-xs font-medium">{{ sale.creator.first_name[0] }}</span>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <p class="text-sm font-medium">Gold Sale</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ sale.date.strftime('%Y-%m-%d') }} • {{ sale.creator.full_name }}</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-semibold">{{ "%.2f"|format(sale.gold_amount) }}g</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">${{ "%.2f"|format(sale.unit_price) }} CAD/g</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="p-8 text-center text-gray-500 dark:text-gray-400">
+                    <i data-feather="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                    <p>No sales recorded yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Update exchange rates periodically
+function updateExchangeRates() {
+    fetch('/api/exchange-rates')
+        .then(response => response.json())
+        .then(data => {
+            // Update the display without page reload
+            document.getElementById('exchange-update-time').textContent = new Date().toLocaleTimeString();
+        })
+        .catch(error => console.error('Error updating exchange rates:', error));
+}
+
+// Update every 5 minutes
+setInterval(updateExchangeRates, 300000);
+</script>
+{% endblock %}

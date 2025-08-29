@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Founders Management{% endblock %}</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    
+    <!-- Telegram WebApp -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <script>
+        // Configure Tailwind for dark mode
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        telegram: {
+                            blue: '#0088cc',
+                            dark: '#1a1a2e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+    <!-- Navigation -->
+    {% if session.user_id %}
+    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-telegram-blue">Founders Management</h1>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Dark mode toggle -->
+                    <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i data-feather="moon" class="w-5 h-5 dark:hidden"></i>
+                        <i data-feather="sun" class="w-5 h-5 hidden dark:block"></i>
+                    </button>
+                    
+                    <!-- User menu -->
+                    <div class="flex items-center space-x-2">
+                        {% if user and user.photo_url %}
+                        <img src="{{ user.photo_url }}" alt="{{ user.full_name }}" class="w-8 h-8 rounded-full">
+                        {% else %}
+                        <div class="w-8 h-8 bg-telegram-blue rounded-full flex items-center justify-center">
+                            <span class="text-white text-sm font-medium">
+                                {{ user.first_name[0] if user else 'U' }}
+                            </span>
+                        </div>
+                        {% endif %}
+                        <span class="text-sm font-medium hidden sm:block">{{ user.full_name if user else 'User' }}</span>
+                    </div>
+                    
+                    <a href="{{ url_for('logout') }}" class="text-red-600 hover:text-red-700 p-2">
+                        <i data-feather="log-out" class="w-5 h-5"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Mobile Navigation -->
+    <div class="sm:hidden bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 fixed bottom-0 left-0 right-0 z-10">
+        <div class="flex justify-around py-2">
+            <a href="{{ url_for('dashboard') }}" class="flex flex-col items-center p-2 {{ 'text-telegram-blue' if request.endpoint == 'dashboard' else 'text-gray-600 dark:text-gray-400' }}">
+                <i data-feather="home" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Home</span>
+            </a>
+            <a href="{{ url_for('purchase') }}" class="flex flex-col items-center p-2 {{ 'text-telegram-blue' if request.endpoint == 'purchase' else 'text-gray-600 dark:text-gray-400' }}">
+                <i data-feather="plus-circle" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Buy</span>
+            </a>
+            <a href="{{ url_for('sale') }}" class="flex flex-col items-center p-2 {{ 'text-telegram-blue' if request.endpoint == 'sale' else 'text-gray-600 dark:text-gray-400' }}">
+                <i data-feather="minus-circle" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Sell</span>
+            </a>
+            {% if session.is_admin %}
+            <a href="{{ url_for('admin') }}" class="flex flex-col items-center p-2 {{ 'text-telegram-blue' if request.endpoint == 'admin' else 'text-gray-600 dark:text-gray-400' }}">
+                <i data-feather="users" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Admin</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            {% for category, message in messages %}
+            <div class="mb-4 p-4 rounded-lg border {{ 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/50 dark:border-red-700 dark:text-red-200' if category == 'error' else 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/50 dark:border-green-700 dark:text-green-200' }}">
+                <div class="flex items-center">
+                    <i data-feather="{{ 'alert-circle' if category == 'error' else 'check-circle' }}" class="w-5 h-5 mr-2"></i>
+                    {{ message }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 {{ 'pb-20 sm:pb-0' if session.user_id else '' }}">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/telegram.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+        
+        // Dark mode functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            const html = document.documentElement;
+            
+            // Check for saved theme preference or default to dark mode
+            const savedTheme = localStorage.getItem('theme');
+            const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (savedTheme === 'dark' || (!savedTheme && systemDark)) {
+                html.classList.add('dark');
+            } else {
+                html.classList.remove('dark');
+            }
+            
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('click', function() {
+                    html.classList.toggle('dark');
+                    localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+                    feather.replace(); // Re-render icons
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Founders Management - Gold Trading System{% endblock %}
+
+{% block content %}
+<div class="min-h-screen">
+    {% if session.user_id %}
+        <!-- Authenticated user - redirect handled by route, but show loading state -->
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-telegram-blue mx-auto mb-4"></div>
+                <p class="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+            </div>
+        </div>
+        <script>
+            // Redirect to dashboard if somehow this page loads for authenticated users
+            setTimeout(() => {
+                window.location.href = '{{ url_for("dashboard") }}';
+            }, 100);
+        </script>
+    {% else %}
+        <!-- Landing page for unauthenticated users -->
+        <div class="relative overflow-hidden">
+            <!-- Hero Section -->
+            <div class="relative pt-16 pb-20 sm:pt-24 sm:pb-28">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center">
+                        <!-- Logo/Icon -->
+                        <div class="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-gradient-bg-telegram mb-8">
+                            <i data-feather="trending-up" class="h-10 w-10 text-white"></i>
+                        </div>
+                        
+                        <!-- Title -->
+                        <h1 class="text-4xl sm:text-6xl font-extrabold text-gray-900 dark:text-white mb-6">
+                            <span class="block">Founders</span>
+                            <span class="block text-telegram-blue">Management</span>
+                        </h1>
+                        
+                        <!-- Subtitle -->
+                        <p class="text-xl sm:text-2xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+                            Professional gold purchase and sales management system with real-time profit tracking and inventory management.
+                        </p>
+                        
+                        <!-- CTA Button -->
+                        <div class="mb-12">
+                            <a href="{{ url_for('login') }}" 
+                               class="inline-flex items-center px-8 py-4 border border-transparent text-lg font-medium rounded-lg text-white bg-telegram-blue hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-telegram-blue transition-all duration-200 transform hover:scale-105">
+                                <i data-feather="shield" class="w-5 h-5 mr-2"></i>
+                                Access via Telegram
+                                <i data-feather="arrow-right" class="w-5 h-5 ml-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Features Section -->
+            <div class="py-16 bg-gray-50 dark:bg-gray-800">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center mb-16">
+                        <h2 class="text-3xl font-extrabold text-gray-900 dark:text-white mb-4">
+                            Comprehensive Gold Trading Features
+                        </h2>
+                        <p class="text-lg text-gray-600 dark:text-gray-300">
+                            Everything you need to manage your gold trading business efficiently
+                        </p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Purchase Management -->
+                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-6 text-center transform hover:scale-105 transition-all duration-200">
+                            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <i data-feather="shopping-cart" class="w-6 h-6 text-blue-600 dark:text-blue-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Purchase Tracking</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">
+                                Record and track all gold purchases with detailed seller information, dates, and pricing in multiple currencies.
+                            </p>
+                        </div>
+                        
+                        <!-- Sales Management -->
+                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-6 text-center transform hover:scale-105 transition-all duration-200">
+                            <div class="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <i data-feather="trending-up" class="w-6 h-6 text-green-600 dark:text-green-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Sales Management</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">
+                                Process sales transactions with automatic inventory deduction and profit calculation using FIFO method.
+                            </p>
+                        </div>
+                        
+                        <!-- Profit Analytics -->
+                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-6 text-center transform hover:scale-105 transition-all duration-200">
+                            <div class="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <i data-feather="dollar-sign" class="w-6 h-6 text-yellow-600 dark:text-yellow-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Profit Analytics</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">
+                                Real-time profit calculations in CAD, USD, and IRR with comprehensive financial reporting.
+                            </p>
+                        </div>
+                        
+                        <!-- Live Exchange Rates -->
+                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-6 text-center transform hover:scale-105 transition-all duration-200">
+                            <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <i data-feather="globe" class="w-6 h-6 text-purple-600 dark:text-purple-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Live Exchange Rates</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">
+                                Up-to-date currency exchange rates for accurate multi-currency transactions and reporting.
+                            </p>
+                        </div>
+                        
+                        <!-- Inventory Management -->
+                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-6 text-center transform hover:scale-105 transition-all duration-200">
+                            <div class="w-12 h-12 bg-orange-100 dark:bg-orange-900/50 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <i data-feather="package" class="w-6 h-6 text-orange-600 dark:text-orange-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Inventory Control</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">
+                                Real-time inventory tracking with automatic updates and comprehensive stock management.
+                            </p>
+                        </div>
+                        
+                        <!-- Secure Access -->
+                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-6 text-center transform hover:scale-105 transition-all duration-200">
+                            <div class="w-12 h-12 bg-red-100 dark:bg-red-900/50 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <i data-feather="shield" class="w-6 h-6 text-red-600 dark:text-red-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Secure Access</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">
+                                Telegram-based authentication with admin-controlled whitelist for maximum security.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Security Notice -->
+            <div class="py-16">
+                <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-8">
+                        <div class="w-16 h-16 bg-telegram-blue rounded-full flex items-center justify-center mx-auto mb-6">
+                            <i data-feather="lock" class="w-8 h-8 text-white"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                            Secure Telegram Integration
+                        </h3>
+                        <p class="text-lg text-gray-600 dark:text-gray-300 mb-6">
+                            This application uses Telegram WebApp for secure authentication. Only authorized users with valid Telegram accounts can access the system.
+                        </p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                            <div class="flex items-center justify-center text-gray-600 dark:text-gray-300">
+                                <i data-feather="check-circle" class="w-4 h-4 text-green-600 mr-2"></i>
+                                Encrypted Communication
+                            </div>
+                            <div class="flex items-center justify-center text-gray-600 dark:text-gray-300">
+                                <i data-feather="check-circle" class="w-4 h-4 text-green-600 mr-2"></i>
+                                Admin Whitelist Control
+                            </div>
+                            <div class="flex items-center justify-center text-gray-600 dark:text-gray-300">
+                                <i data-feather="check-circle" class="w-4 h-4 text-green-600 mr-2"></i>
+                                Mobile Optimized
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Auto-redirect to login if this is accessed outside Telegram -->
+        <script>
+            // Check if we're in Telegram WebApp environment
+            setTimeout(() => {
+                if (!window.Telegram || !window.Telegram.WebApp) {
+                    // Not in Telegram WebApp, redirect to login page
+                    window.location.href = '{{ url_for("login") }}';
+                }
+            }, 3000);
+        </script>
+    {% endif %}
+</div>
+{% endblock %}

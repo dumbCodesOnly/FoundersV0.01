@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Founders Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div class="text-center">
+            <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-telegram-blue">
+                <i data-feather="shield" class="h-6 w-6 text-white"></i>
+            </div>
+            <h2 class="mt-6 text-3xl font-extrabold">Founders Management</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Gold Purchase & Sales Management System
+            </p>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 py-8 px-6 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700">
+            <div id="login-status" class="text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-telegram-blue mx-auto mb-4"></div>
+                <p class="text-gray-600 dark:text-gray-400">Connecting to Telegram...</p>
+            </div>
+            
+            <div id="login-error" class="hidden text-center">
+                <div class="bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-lg p-4 mb-4">
+                    <div class="flex items-center justify-center">
+                        <i data-feather="alert-circle" class="h-5 w-5 text-red-600 dark:text-red-400 mr-2"></i>
+                        <span class="text-red-800 dark:text-red-200">
+                            This application must be opened through Telegram
+                        </span>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Please access this app through the Telegram WebApp interface
+                </p>
+            </div>
+            
+            <div id="access-denied" class="hidden text-center">
+                <div class="bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 mb-4">
+                    <div class="flex items-center justify-center">
+                        <i data-feather="lock" class="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2"></i>
+                        <span class="text-yellow-800 dark:text-yellow-200">
+                            Access Denied
+                        </span>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    You are not authorized to access this application. Please contact the administrator.
+                </p>
+            </div>
+        </div>
+        
+        <div class="text-center text-xs text-gray-500 dark:text-gray-400">
+            <p>Secure authentication via Telegram WebApp</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Telegram WebApp
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        
+        // Get user data
+        const user = tg.initDataUnsafe?.user;
+        
+        if (user) {
+            // Send authentication request
+            fetch('/auth/telegram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user: user,
+                    auth_date: tg.initDataUnsafe?.auth_date,
+                    hash: tg.initDataUnsafe?.hash
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else if (data.error && data.error.includes('Access denied')) {
+                    document.getElementById('login-status').classList.add('hidden');
+                    document.getElementById('access-denied').classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Authentication failed');
+                }
+            })
+            .catch(error => {
+                console.error('Auth error:', error);
+                document.getElementById('login-status').classList.add('hidden');
+                document.getElementById('login-error').classList.remove('hidden');
+            });
+        } else {
+            // No user data available
+            setTimeout(() => {
+                document.getElementById('login-status').classList.add('hidden');
+                document.getElementById('login-error').classList.remove('hidden');
+            }, 2000);
+        }
+    } else {
+        // Not in Telegram WebApp
+        setTimeout(() => {
+            document.getElementById('login-status').classList.add('hidden');
+            document.getElementById('login-error').classList.remove('hidden');
+        }, 2000);
+    }
+});
+</script>
+{% endblock %}

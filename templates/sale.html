@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}New Sale - Founders Management{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center mb-4">
+                <a href="{{ url_for('dashboard') }}" class="mr-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <i data-feather="arrow-left" class="w-5 h-5"></i>
+                </a>
+                <h1 class="text-2xl font-bold">Record New Sale</h1>
+            </div>
+            <p class="text-gray-600 dark:text-gray-400">Sell gold from your inventory</p>
+        </div>
+
+        <!-- Inventory Status -->
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+            <div class="flex items-center">
+                <i data-feather="package" class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-3"></i>
+                <div>
+                    <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Available Inventory</p>
+                    <p class="text-lg font-bold text-yellow-900 dark:text-yellow-100">{{ "%.2f"|format(available_inventory) }} grams</p>
+                </div>
+            </div>
+        </div>
+
+        {% if available_inventory <= 0 %}
+        <!-- No Inventory Warning -->
+        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 mb-6">
+            <div class="flex items-center">
+                <i data-feather="alert-triangle" class="w-6 h-6 text-red-600 dark:text-red-400 mr-3"></i>
+                <div>
+                    <p class="text-lg font-medium text-red-800 dark:text-red-200">No Inventory Available</p>
+                    <p class="text-red-600 dark:text-red-300 mt-1">You need to purchase gold before you can make sales.</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a href="{{ url_for('purchase') }}" class="bg-telegram-blue text-white px-4 py-2 rounded-lg hover:bg-blue-600 inline-flex items-center">
+                    <i data-feather="plus" class="w-4 h-4 mr-2"></i>
+                    Record Purchase
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <!-- Sale Form -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <form method="POST" class="space-y-6">
+                <!-- Date -->
+                <div>
+                    <label for="date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Sale Date
+                    </label>
+                    <input type="date" 
+                           id="date" 
+                           name="date" 
+                           required
+                           value="{{ today }}"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                </div>
+
+                <!-- Gold Amount -->
+                <div>
+                    <label for="gold_amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Gold Amount (grams)
+                    </label>
+                    <input type="number" 
+                           id="gold_amount" 
+                           name="gold_amount" 
+                           step="0.01" 
+                           min="0.01"
+                           max="{{ available_inventory }}"
+                           required
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                           placeholder="0.00">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Maximum available: {{ "%.2f"|format(available_inventory) }}g</p>
+                </div>
+
+                <!-- Unit Price -->
+                <div>
+                    <label for="unit_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Unit Price (CAD per gram)
+                    </label>
+                    <input type="number" 
+                           id="unit_price" 
+                           name="unit_price" 
+                           step="0.01" 
+                           min="0.01"
+                           required
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                           placeholder="0.00">
+                </div>
+
+                <!-- Total Revenue Display -->
+                <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Revenue:</span>
+                        <span id="total-revenue" class="text-lg font-bold text-green-600 dark:text-green-400">$0.00 CAD</span>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex space-x-4">
+                    <button type="submit" 
+                            class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 font-medium">
+                        Record Sale
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" 
+                       class="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 py-2 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 focus:ring-2 focus:ring-gray-300 font-medium text-center">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Creator Info -->
+        <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div class="flex items-center">
+                {% if user.photo_url %}
+                <img src="{{ user.photo_url }}" alt="{{ user.full_name }}" class="w-8 h-8 rounded-full mr-3">
+                {% else %}
+                <div class="w-8 h-8 bg-telegram-blue rounded-full flex items-center justify-center mr-3">
+                    <span class="text-white text-sm font-medium">{{ user.first_name[0] }}</span>
+                </div>
+                {% endif %}
+                <div>
+                    <p class="text-sm font-medium text-blue-800 dark:text-blue-200">Created by {{ user.full_name }}</p>
+                    <p class="text-xs text-blue-600 dark:text-blue-300">This sale will be attributed to your account</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const goldAmountInput = document.getElementById('gold_amount');
+    const unitPriceInput = document.getElementById('unit_price');
+    const totalRevenueDisplay = document.getElementById('total-revenue');
+
+    function updateTotalRevenue() {
+        const goldAmount = parseFloat(goldAmountInput.value) || 0;
+        const unitPrice = parseFloat(unitPriceInput.value) || 0;
+        
+        const totalRevenue = goldAmount * unitPrice;
+        totalRevenueDisplay.textContent = `$${totalRevenue.toFixed(2)} CAD`;
+    }
+
+    if (goldAmountInput && unitPriceInput) {
+        goldAmountInput.addEventListener('input', updateTotalRevenue);
+        unitPriceInput.addEventListener('input', updateTotalRevenue);
+    }
+});
+</script>
+{% endblock %}
