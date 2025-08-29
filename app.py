@@ -96,23 +96,36 @@ def init_database():
 def create_app():
     """Create and configure the Flask application"""
     try:
+        # Import utils for template functions first
+        from utils import format_gold_quantity
+        
+        # Make format function available in templates
+        app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+        
         with app.app_context():
             init_database()
-            
-            # Import utils for template functions
-            from utils import format_gold_quantity
-            
-            # Make format function available in templates
-            app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
             
             # Import routes after database initialization
             import routes
         return app
     except Exception as e:
         logging.error(f"App initialization error: {e}")
-        # Fallback - just import routes
+        # Fallback - still register template function and import routes
+        try:
+            from utils import format_gold_quantity
+            app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+        except:
+            pass
         import routes
         return app
+
+# Register template functions globally before app initialization
+try:
+    from utils import format_gold_quantity
+    app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+    logging.info("Template functions registered successfully")
+except Exception as e:
+    logging.error(f"Failed to register template functions: {e}")
 
 # Initialize the app for both environments
 try:

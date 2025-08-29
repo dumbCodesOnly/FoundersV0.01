@@ -6,21 +6,28 @@ from app import db
 
 def format_gold_quantity(amount):
     """Format gold quantity in k format (1k, 2k, 1.5k, etc.)"""
-    if amount == 0:
+    try:
+        if amount is None:
+            return "0"
+        
+        amount = float(amount)
+        if amount == 0:
+            return "0"
+        elif amount >= 1000:
+            # Convert to k format
+            k_amount = amount / 1000
+            if k_amount == int(k_amount):
+                return f"{int(k_amount)}k"
+            else:
+                return f"{k_amount:.1f}k"
+        else:
+            # For amounts less than 1000, show with decimal if needed
+            if amount == int(amount):
+                return str(int(amount))
+            else:
+                return f"{amount:.1f}"
+    except (ValueError, TypeError):
         return "0"
-    elif amount >= 1000:
-        # Convert to k format
-        k_amount = amount / 1000
-        if k_amount == int(k_amount):
-            return f"{int(k_amount)}k"
-        else:
-            return f"{k_amount:.1f}k"
-    else:
-        # For amounts less than 1000, show with decimal if needed
-        if amount == int(amount):
-            return str(int(amount))
-        else:
-            return f"{amount:.1f}"
 
 def get_exchange_rates():
     """Fetch live exchange rates from multiple sources"""
