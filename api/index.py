@@ -1,4 +1,3 @@
-import sys
 import os
 import logging
 
@@ -6,18 +5,13 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Add the parent directory to Python path for imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
 # Set Vercel environment variable for proper detection
 os.environ['VERCEL'] = '1'
 
 try:
     logger.info("Starting Vercel import process...")
     
-    # Import the Flask app - this will trigger environment detection as 'vercel'
+    # Import the Flask app from local directory
     from app import app
     
     logger.info("Flask app imported successfully in Vercel")
@@ -40,16 +34,15 @@ except Exception as e:
         return jsonify({
             'error': 'App import failed in Vercel',
             'details': str(e),
-            'environment': dict(os.environ),
-            'python_path': sys.path[:5]
+            'current_dir': os.path.dirname(os.path.abspath(__file__)),
+            'files_in_dir': os.listdir(os.path.dirname(os.path.abspath(__file__)))
         }), 500
     
     @application.route('/debug')
     def debug_info():
         return jsonify({
-            'current_dir': current_dir,
-            'parent_dir': parent_dir,
-            'python_version': sys.version,
+            'current_dir': os.path.dirname(os.path.abspath(__file__)),
+            'python_version': __import__('sys').version,
             'environment_vars': {k: v for k, v in os.environ.items() if not k.startswith('_')},
         })
     
