@@ -20,23 +20,33 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure the database
 database_url = os.environ.get("DATABASE_URL")
-if database_url:
-    # Production environment (Vercel + Neon) - use PostgreSQL
-    # Neon PostgreSQL connection with optimized settings
+if database_url and database_url.startswith("postgresql"):
+    # PostgreSQL environment - adjust SSL mode based on URL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    
+    # Extract SSL mode from database URL or default to disable for Replit
+    ssl_mode = "disable"
+    if "sslmode=require" in database_url:
+        ssl_mode = "require"
+    elif "sslmode=prefer" in database_url:
+        ssl_mode = "prefer"
+    elif "sslmode=disable" in database_url:
+        ssl_mode = "disable"
+    
+    connect_args = {"connect_timeout": 10}
+    if ssl_mode != "disable":
+        connect_args["sslmode"] = ssl_mode
+    
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_size": 5,
         "pool_recycle": 300,
         "pool_pre_ping": True,
         "pool_timeout": 20,
         "max_overflow": 0,
-        "connect_args": {
-            "sslmode": "require",
-            "connect_timeout": 10,
-        }
+        "connect_args": connect_args
     }
 else:
-    # Development environment (Replit) - use SQLite
+    # Development environment (no PostgreSQL) - use SQLite
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///founders_management.db"
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
 
