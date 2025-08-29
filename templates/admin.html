@@ -150,6 +150,72 @@
         </div>
     </div>
 
+    <!-- System Configuration -->
+    <div class="mt-8">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold flex items-center">
+                    <i data-feather="settings" class="w-5 h-5 mr-2 text-telegram-blue"></i>
+                    System Configuration
+                </h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Configure tax and fee settings for sales calculations</p>
+            </div>
+
+            <div class="p-6">
+                <form method="post" action="{{ url_for('update_settings') }}" class="space-y-6">
+                    <!-- Tax/Fee Percentage -->
+                    <div>
+                        <label for="tax_fee_percentage" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Tax & Transaction Fee Percentage
+                        </label>
+                        <div class="flex items-center space-x-3">
+                            <input type="number" 
+                                   id="tax_fee_percentage" 
+                                   name="tax_fee_percentage" 
+                                   step="0.1" 
+                                   min="0" 
+                                   max="50"
+                                   value="{{ tax_fee_percentage or 0 }}"
+                                   class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-telegram-blue focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                                   placeholder="10.0">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">%</span>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            This percentage will be automatically deducted from sale revenues before calculating profits. 
+                            Example: If set to 10%, selling 40k gold at $0.40 CAD/k will deduct 10% from the $16 total, 
+                            resulting in $14.40 net revenue for profit calculations.
+                        </p>
+                    </div>
+
+                    <!-- Save Button -->
+                    <div class="flex justify-end">
+                        <button type="submit" 
+                                class="bg-telegram-blue text-white px-4 py-2 rounded-lg hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium">
+                            <i data-feather="save" class="w-4 h-4 mr-2 inline"></i>
+                            Save Settings
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Current Setting Display -->
+                <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div class="flex items-center">
+                        <i data-feather="info" class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-3"></i>
+                        <div>
+                            <p class="text-sm font-medium text-blue-800 dark:text-blue-200">Current Configuration</p>
+                            <p class="text-sm text-blue-600 dark:text-blue-300">
+                                Tax & Fee Rate: <strong>{{ tax_fee_percentage or 0 }}%</strong>
+                                {% if tax_fee_percentage and tax_fee_percentage > 0 %}
+                                | Example: $100 sale → ${{ '%.2f'|format(100 - (100 * (tax_fee_percentage or 0) / 100)) }} net revenue
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Statistics -->
     <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">

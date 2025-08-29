@@ -110,6 +110,57 @@ except Exception as exchange_rate_model_error:
     logging.error(f"ExchangeRate model error traceback: {traceback.format_exc()}")
     raise
 
+logging.debug("Defining Settings model...")
+try:
+    class Settings(db.Model):
+        __tablename__ = 'settings'
+        id = db.Column(db.Integer, primary_key=True)
+        key = db.Column(db.String(100), unique=True, nullable=False)
+        value = db.Column(db.Text, nullable=False)
+        description = db.Column(db.Text)
+        updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+        updated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+        
+        # Relationship
+        updater = db.relationship('User', backref='settings_updates')
+        
+        def __repr__(self):
+            return f'<Settings {self.key}: {self.value}>'
+        
+        @classmethod
+        def get_value(cls, key, default=None):
+            """Helper method to get a setting value"""
+            setting = cls.query.filter_by(key=key).first()
+            return setting.value if setting else default
+        
+        @classmethod
+        def set_value(cls, key, value, description=None, user_id=None):
+            """Helper method to set a setting value"""
+            setting = cls.query.filter_by(key=key).first()
+            if setting:
+                setting.value = str(value)
+                setting.updated_at = datetime.utcnow()
+                if user_id:
+                    setting.updated_by = user_id
+                if description:
+                    setting.description = description
+            else:
+                setting = cls(
+                    key=key,
+                    value=str(value),
+                    description=description,
+                    updated_by=user_id or 1  # Default to first user if none provided
+                )
+                db.session.add(setting)
+            db.session.commit()
+            return setting
+
+    logging.debug("Settings model defined successfully")
+except Exception as settings_model_error:
+    logging.error(f"CRITICAL: Failed to define Settings model: {settings_model_error}")
+    logging.error(f"Settings model error traceback: {traceback.format_exc()}")
+    raise
+
 # Note: Relationships temporarily removed to resolve Vercel deployment issues
 # Can be added back once the core deployment issue is resolved
 

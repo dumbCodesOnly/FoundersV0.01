@@ -4,7 +4,7 @@ import json
 import logging
 import traceback
 from .app import app, db
-from .models import User, Purchase, Sale, ExchangeRate
+from .models import User, Purchase, Sale, ExchangeRate, Settings
 from .utils import get_exchange_rates, calculate_inventory_and_profit, convert_currency
 
 # Configure route logging
@@ -273,19 +273,25 @@ def sale():
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
                 
             sale_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            total_revenue = gold_amount_k * unit_price  # Calculate total revenue based on k amount and price per 1k tokens
+            gross_revenue = gold_amount_k * unit_price  # Calculate gross revenue based on k amount and price per 1k tokens
+            
+            # Apply tax/fee deduction
+            tax_fee_setting = Settings.get_value('tax_fee_percentage', '0')
+            tax_fee_percentage = float(tax_fee_setting) if tax_fee_setting else 0.0
+            tax_fee_amount = gross_revenue * (tax_fee_percentage / 100)
+            net_revenue = gross_revenue - tax_fee_amount
             
             sale = Sale()
             sale.gold_amount = gold_amount  # Store as total gold tokens
             sale.unit_price = unit_price  # Store as price per 1000 tokens
-            sale.total_revenue = total_revenue
+            sale.total_revenue = net_revenue  # Store net revenue after tax/fee deduction
             sale.date = sale_date
             sale.created_by = user.id
             
             db.session.add(sale)
             db.session.commit()
             
-            flash(f'Sale recorded: {gold_amount_k}k WoW gold for ${total_revenue:.2f} CAD', 'success')
+            flash(f'Sale recorded: {gold_amount_k}k WoW gold for ${net_revenue:.2f} CAD (net after {tax_fee_percentage}% tax/fees)', 'success')
             return redirect(url_for('dashboard'))
             
         except ValueError as e:
@@ -295,7 +301,11 @@ def sale():
             flash('Error recording sale', 'error')
             db.session.rollback()
     
-    return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
+    # Get current tax/fee percentage setting for frontend calculation
+    tax_fee_setting = Settings.get_value('tax_fee_percentage', '0')
+    tax_fee_percentage = float(tax_fee_setting) if tax_fee_setting else 0.0
+    
+    return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat(), tax_fee_percentage=tax_fee_percentage)
 
 @app.route('/admin')
 def admin():
@@ -307,7 +317,11 @@ def admin():
     user = User.query.get(session['user_id'])
     users = User.query.all()
     
-    return render_template('admin.html', user=user, users=users)
+    # Get current tax/fee percentage setting
+    tax_fee_setting = Settings.get_value('tax_fee_percentage', '0')
+    tax_fee_percentage = float(tax_fee_setting) if tax_fee_setting else 0.0
+    
+    return render_template('admin.html', user=user, users=users, tax_fee_percentage=tax_fee_percentage)
 
 @app.route('/admin/whitelist/<int:user_id>/<action>')
 def toggle_whitelist(user_id, action):
@@ -406,6 +420,41 @@ def reset_transactions():
         db.session.rollback()
         logging.error(f"Transaction reset failed: {e}")
         flash('Transaction reset failed. Please check logs for details.', 'error')
+    
+    return redirect(url_for('admin'))
+
+@app.route('/admin/update-settings', methods=['POST'])
+def update_settings():
+    """Bot owner only - Update system configuration settings"""
+    # Only allow actual bot owner to update settings
+    if 'telegram_id' not in session or session.get('telegram_id') != app.config['BOT_OWNER_ID']:
+        flash('Bot owner access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        tax_fee_percentage = float(request.form.get('tax_fee_percentage', 0))
+        
+        # Validate percentage range
+        if tax_fee_percentage < 0 or tax_fee_percentage > 50:
+            flash('Tax/fee percentage must be between 0% and 50%', 'error')
+            return redirect(url_for('admin'))
+        
+        # Update the setting
+        Settings.set_value(
+            key='tax_fee_percentage',
+            value=tax_fee_percentage,
+            description='Percentage of tax and transaction fees deducted from sales revenue',
+            user_id=session['user_id']
+        )
+        
+        logging.info(f"Tax/fee percentage updated to {tax_fee_percentage}% by bot owner: {session.get('telegram_id')}")
+        flash(f'Tax & fee percentage updated to {tax_fee_percentage}%', 'success')
+        
+    except ValueError:
+        flash('Invalid tax/fee percentage value', 'error')
+    except Exception as e:
+        logging.error(f"Settings update failed: {e}")
+        flash('Failed to update settings. Please check logs for details.', 'error')
     
     return redirect(url_for('admin'))
 

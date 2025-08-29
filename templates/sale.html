@@ -93,11 +93,22 @@
                            placeholder="0.00">
                 </div>
 
-                <!-- Total Revenue Display -->
-                <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                <!-- Revenue Calculation Display -->
+                <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 space-y-2">
                     <div class="flex justify-between items-center">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Revenue:</span>
-                        <span id="total-revenue" class="text-lg font-bold text-green-600 dark:text-green-400">$0.00 CAD</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Gross Revenue:</span>
+                        <span id="gross-revenue" class="text-lg font-bold text-gray-800 dark:text-gray-200">$0.00 CAD</span>
+                    </div>
+                    {% if tax_fee_percentage and tax_fee_percentage > 0 %}
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">Tax & Fees ({{ tax_fee_percentage }}%):</span>
+                        <span id="tax-fee-amount" class="font-medium text-red-600 dark:text-red-400">-$0.00 CAD</span>
+                    </div>
+                    <hr class="border-gray-200 dark:border-gray-600">
+                    {% endif %}
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Net Revenue:</span>
+                        <span id="net-revenue" class="text-lg font-bold text-green-600 dark:text-green-400">$0.00 CAD</span>
                     </div>
                 </div>
 
@@ -139,19 +150,30 @@
 document.addEventListener('DOMContentLoaded', function() {
     const goldAmountInput = document.getElementById('gold_amount');
     const unitPriceInput = document.getElementById('unit_price');
-    const totalRevenueDisplay = document.getElementById('total-revenue');
+    const grossRevenueDisplay = document.getElementById('gross-revenue');
+    const taxFeeAmountDisplay = document.getElementById('tax-fee-amount');
+    const netRevenueDisplay = document.getElementById('net-revenue');
+    
+    const taxFeePercentage = {{ tax_fee_percentage|default(0) }};
 
-    function updateTotalRevenue() {
+    function updateRevenue() {
         const goldAmount = parseFloat(goldAmountInput.value) || 0;
         const unitPrice = parseFloat(unitPriceInput.value) || 0;
         
-        const totalRevenue = goldAmount * unitPrice;
-        totalRevenueDisplay.textContent = `$${totalRevenue.toFixed(2)} CAD`;
+        const grossRevenue = goldAmount * unitPrice;
+        const taxFeeAmount = grossRevenue * (taxFeePercentage / 100);
+        const netRevenue = grossRevenue - taxFeeAmount;
+        
+        grossRevenueDisplay.textContent = `$${grossRevenue.toFixed(2)} CAD`;
+        if (taxFeeAmountDisplay) {
+            taxFeeAmountDisplay.textContent = `-$${taxFeeAmount.toFixed(2)} CAD`;
+        }
+        netRevenueDisplay.textContent = `$${netRevenue.toFixed(2)} CAD`;
     }
 
     if (goldAmountInput && unitPriceInput) {
-        goldAmountInput.addEventListener('input', updateTotalRevenue);
-        unitPriceInput.addEventListener('input', updateTotalRevenue);
+        goldAmountInput.addEventListener('input', updateRevenue);
+        unitPriceInput.addEventListener('input', updateRevenue);
     }
 });
 </script>
