@@ -55,6 +55,9 @@ try:
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
         created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
         
+        # Relationship
+        creator = db.relationship('User', backref='purchases')
+        
         def __repr__(self):
             return f'<Purchase {self.id}: {self.gold_amount}g @ {self.unit_price} {self.currency}>'
 
@@ -75,6 +78,9 @@ try:
         date = db.Column(db.Date, nullable=False)
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
         created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+        
+        # Relationship
+        creator = db.relationship('User', backref='sales')
         
         def __repr__(self):
             return f'<Sale {self.id}: {self.gold_amount}g @ {self.unit_price} CAD>'
