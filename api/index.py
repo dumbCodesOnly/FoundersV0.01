@@ -12,7 +12,7 @@ os.environ['VERCEL_ENV'] = 'production'
 try:
     logger.info("Starting Vercel import process...")
     
-    # Import the Flask app from local directory
+    # Import the Flask app from the api directory
     from app import app
     
     logger.info("Flask app imported successfully in Vercel")
