@@ -36,37 +36,35 @@ def get_exchange_rates():
     rates = {}
     usd_to_irr_rate = None
     
-    # Try Navasan API for accurate Iranian free market rate (120 free calls/month)
-    # Note: Requires API key from @navasan_contact_bot on Telegram
+    # Try free market IRR rate from PriceToDay API (free, reliable)
     try:
-        # For now, we'll use a simple HTTP request without API key for demo
-        # In production, add API_KEY from environment variables
-        navasan_url = "https://api.navasan.tech/latest.json"
-        # If you have API key: navasan_url = f"https://api.navasan.tech/latest.json?api_key={api_key}"
-        
+        # PriceToDay provides free market rates
+        priceto_url = "https://api.priceto.day/v1/latest/irr/usd"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'application/json'
         }
         
-        irr_response = requests.get(navasan_url, headers=headers, timeout=10)
+        irr_response = requests.get(priceto_url, headers=headers, timeout=10)
         if irr_response.status_code == 200:
             irr_data = irr_response.json()
-            # Navasan returns rates in Iranian Rial
-            if 'usd' in irr_data and 'value' in irr_data['usd']:
-                irr_per_usd = irr_data['usd']['value']
-                usd_to_irr_rate = irr_per_usd
-                # Convert to IRR per CAD (CAD to USD rate ~0.74)
-                irr_per_cad = irr_per_usd * 0.74
-                rates['IRR'] = irr_per_cad
-                rates['USD_to_IRR'] = irr_per_usd
-                logging.info(f"Got IRR rate from Navasan: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
-        elif irr_response.status_code == 429:
-            logging.warning("Navasan API rate limit exceeded")
+            # PriceToDay returns rates in format: {"usd": {"rate": 1014000}}
+            if 'usd' in irr_data and 'rate' in irr_data['usd']:
+                irr_per_usd = float(irr_data['usd']['rate'])
+                # Validate that it's a realistic free market rate (should be > 500,000)
+                if irr_per_usd > 500000:
+                    usd_to_irr_rate = irr_per_usd
+                    # Convert to IRR per CAD (CAD to USD rate ~0.74)
+                    irr_per_cad = irr_per_usd * 0.74
+                    rates['IRR'] = irr_per_cad
+                    rates['USD_to_IRR'] = irr_per_usd
+                    logging.info(f"Got free market IRR rate from PriceToDay: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
+                else:
+                    logging.warning(f"PriceToDay returned unrealistic rate: {irr_per_usd} IRR/USD (seems like official rate, not free market)")
     except Exception as e:
-        logging.warning(f"Failed to get IRR rate from Navasan: {e}")
-    
-    # Try BONBAST as fallback for IRR (if Navasan fails)
+        logging.warning(f"Failed to get IRR rate from PriceToDay: {e}")
+
+    # Try BONBAST as fallback for IRR (if PriceToDay fails)
     if 'IRR' not in rates or 'USD_to_IRR' not in rates:
         try:
             # BONBAST provides free market rates
@@ -76,31 +74,19 @@ def get_exchange_rates():
                 # BONBAST returns rates in different format
                 if 'usd1' in bonbast_data:  # USD sell rate
                     irr_per_usd = float(bonbast_data['usd1'])
-                    usd_to_irr_rate = irr_per_usd
-                    irr_per_cad = irr_per_usd * 0.74
-                    rates['IRR'] = irr_per_cad
-                    rates['USD_to_IRR'] = irr_per_usd
-                    logging.info(f"Got IRR rate from BONBAST: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
+                    # Validate that it's a realistic free market rate
+                    if irr_per_usd > 500000:
+                        usd_to_irr_rate = irr_per_usd
+                        irr_per_cad = irr_per_usd * 0.74
+                        rates['IRR'] = irr_per_cad
+                        rates['USD_to_IRR'] = irr_per_usd
+                        logging.info(f"Got free market IRR rate from BONBAST: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
+                    else:
+                        logging.warning(f"BONBAST returned unrealistic rate: {irr_per_usd} IRR/USD")
         except Exception as e:
             logging.warning(f"Failed to get IRR rate from BONBAST: {e}")
-    
-    # Try alternative free market IRR APIs if still no USD_to_IRR rate
-    if 'USD_to_IRR' not in rates:
-        try:
-            # Try ExchangeRate-API for USD to IRR
-            exchange_response = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10)
-            if exchange_response.status_code == 200:
-                exchange_data = exchange_response.json()
-                if 'rates' in exchange_data and 'IRR' in exchange_data['rates']:
-                    irr_per_usd = exchange_data['rates']['IRR']
-                    usd_to_irr_rate = irr_per_usd
-                    rates['USD_to_IRR'] = irr_per_usd
-                    # Also update CAD rate if not set
-                    if 'IRR' not in rates:
-                        rates['IRR'] = irr_per_usd * 0.74
-                    logging.info(f"Got USD to IRR rate from ExchangeRate-API: {irr_per_usd}")
-        except Exception as e:
-            logging.warning(f"Failed to get USD to IRR rate from ExchangeRate-API: {e}")
+
+    # Skip ExchangeRate-API as it only provides official rates (~42,000), not free market rates
     
     # Get USD rate from exchangerate.host
     try:
@@ -122,14 +108,14 @@ def get_exchange_rates():
     
     if 'USD_to_IRR' not in rates:
         # Updated fallback rate to realistic 2025 free market rate (~1M IRR/USD)
-        fallback_usd_to_irr = 1014000  # NIMA/free market rate
+        fallback_usd_to_irr = 1001000  # Current free market rate as specified by user
         rates['USD_to_IRR'] = fallback_usd_to_irr
         usd_to_irr_rate = fallback_usd_to_irr
-        logging.info(f"Using fallback USD to IRR rate: {fallback_usd_to_irr} (NIMA/free market rate)")
+        logging.info(f"Using fallback USD to IRR rate: {fallback_usd_to_irr} (free market rate - APIs failed)")
     
     if 'IRR' not in rates:
         # Calculate IRR/CAD from USD/IRR rate
-        irr_per_cad = usd_to_irr_rate * 0.74 if usd_to_irr_rate else 750360
+        irr_per_cad = usd_to_irr_rate * 0.74 if usd_to_irr_rate else 740740  # 1,001,000 * 0.74
         rates['IRR'] = irr_per_cad
         logging.info(f"Calculated IRR/CAD rate: {irr_per_cad}")
     
