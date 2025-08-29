@@ -13,7 +13,7 @@ try:
     logger.info("Starting Vercel import process...")
     
     # Import the Flask app from the api directory
-    from app import app
+    from .app import app
     
     logger.info("Flask app imported successfully in Vercel")
     
