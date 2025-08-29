@@ -9,5 +9,5 @@ sys.path.insert(0, parent_dir)
 # Import the Flask app directly
 from app import app
 
-# Export for Vercel - this is what Vercel expects
+# Export for Vercel - this is the WSGI application
 application = app
