@@ -17,11 +17,15 @@ try:
     
     logger.info("Flask app imported successfully in Vercel")
     
-    # Export the application for Vercel (multiple export names for compatibility)
-    # Use the WSGI app directly
-    application = app.wsgi_app if hasattr(app, 'wsgi_app') else app
-    handler = application  # For Vercel serverless functions
-    app = application      # For Vercel WSGI apps
+    # Export the application for Vercel
+    # Vercel expects a callable WSGI application
+    def wsgi_handler(environ, start_response):
+        return app(environ, start_response)
+    
+    # Export with multiple names for compatibility
+    handler = wsgi_handler
+    application = wsgi_handler
+    app = wsgi_handler
     
     logger.info("WSGI application configured for Vercel")
     
@@ -50,10 +54,12 @@ except Exception as e:
             'environment_vars': {k: v for k, v in os.environ.items() if not k.startswith('_')},
         })
     
-    # Export fallback app with multiple names for Vercel
-    fallback_wsgi = fallback_app.wsgi_app if hasattr(fallback_app, 'wsgi_app') else fallback_app
-    application = fallback_wsgi
-    handler = fallback_wsgi
-    app = fallback_wsgi
+    # Export fallback app as proper WSGI callable for Vercel
+    def fallback_wsgi_handler(environ, start_response):
+        return fallback_app(environ, start_response)
+    
+    handler = fallback_wsgi_handler
+    application = fallback_wsgi_handler
+    app = fallback_wsgi_handler
     
     logger.info("Fallback error app created for Vercel")
