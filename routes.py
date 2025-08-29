@@ -2,9 +2,25 @@ from flask import render_template, request, redirect, url_for, session, flash, j
 from datetime import datetime, date
 import json
 import logging
+import traceback
 from app import app, db
 from models import User, Purchase, Sale, ExchangeRate
 from utils import get_exchange_rates, calculate_inventory_and_profit, convert_currency
+
+# Configure route logging
+logger = logging.getLogger(__name__)
+
+# Add request logging middleware
+@app.before_request
+def log_request_info():
+    logger.info(f"Request: {request.method} {request.path} from {request.remote_addr}")
+    if request.method == 'POST':
+        logger.info(f"POST data keys: {list(request.form.keys()) if request.form else 'None'}")
+
+@app.after_request
+def log_response_info(response):
+    logger.info(f"Response: {response.status_code} for {request.path}")
+    return response
 
 @app.route('/')
 def index():
@@ -258,8 +274,50 @@ def api_exchange_rates():
 
 @app.errorhandler(404)
 def not_found(error):
+    logger.warning(f"404 Error: {request.path} not found")
     return render_template('404.html'), 404
 
 @app.errorhandler(500)
 def server_error(error):
+    logger.error(f"500 Error: {str(error)}")
+    logger.error(f"500 Error traceback: {traceback.format_exc()}")
     return render_template('500.html'), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle all unhandled exceptions"""
+    logger.error(f"Unhandled exception: {str(e)}")
+    logger.error(f"Exception traceback: {traceback.format_exc()}")
+    
+    # For AJAX requests, return JSON error
+    if request.is_json or 'application/json' in request.headers.get('Content-Type', ''):
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e) if app.debug else 'An error occurred'
+        }), 500
+    
+    # For regular requests, return error page
+    return render_template('500.html'), 500
+
+# Debug route for Vercel
+@app.route('/debug/health')
+def health_check():
+    """Health check endpoint for debugging"""
+    try:
+        # Test database connection
+        result = db.session.execute(db.text("SELECT 1")).scalar()
+        db_status = "OK" if result == 1 else "FAILED"
+        
+        return jsonify({
+            'status': 'OK',
+            'database': db_status,
+            'environment': 'production' if app.config.get('SQLALCHEMY_DATABASE_URI', '').startswith('postgresql') else 'development',
+            'python_version': f"{__import__('sys').version_info.major}.{__import__('sys').version_info.minor}.{__import__('sys').version_info.micro}",
+            'config_keys': list(app.config.keys())[:10]  # First 10 config keys
+        })
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'ERROR',
+            'error': str(e)
+        }), 500

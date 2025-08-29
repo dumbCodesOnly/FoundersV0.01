@@ -1,12 +1,16 @@
 import os
 import logging
+import traceback
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging with more detailed format for debugging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+)
 
 class Base(DeclarativeBase):
     pass
@@ -69,13 +73,29 @@ def init_database():
     try:
         # Import models to ensure tables are created
         import models
+        logging.info("Models imported successfully")
         
         # Create all tables
         db.create_all()
         logging.info("Database tables created successfully")
         
+        # Log database connection info (without credentials)
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if db_uri.startswith('postgresql'):
+            logging.info("Using PostgreSQL database (production)")
+        else:
+            logging.info("Using SQLite database (development)")
+        
+        # Test database connection
+        result = db.session.execute(db.text("SELECT 1")).scalar()
+        if result == 1:
+            logging.info("Database connection test successful")
+        else:
+            logging.warning("Database connection test returned unexpected result")
+        
         # Create default bot owner if specified
         if app.config['BOT_OWNER_ID'] > 0:
+            logging.info(f"Checking for bot owner with ID: {app.config['BOT_OWNER_ID']}")
             existing_owner = models.User.query.filter_by(telegram_id=app.config['BOT_OWNER_ID']).first()
             if not existing_owner:
                 owner = models.User()
@@ -88,9 +108,12 @@ def init_database():
                 db.session.add(owner)
                 db.session.commit()
                 logging.info(f"Created bot owner with ID: {app.config['BOT_OWNER_ID']}")
+            else:
+                logging.info(f"Bot owner already exists with ID: {app.config['BOT_OWNER_ID']}")
                 
     except Exception as e:
         logging.error(f"Database initialization error: {e}")
+        logging.error(f"Database error traceback: {traceback.format_exc()}")
 
 # Initialize database and routes
 def create_app():
@@ -110,13 +133,18 @@ def create_app():
         return app
     except Exception as e:
         logging.error(f"App initialization error: {e}")
+        logging.error(f"App initialization traceback: {traceback.format_exc()}")
         # Fallback - still register template function and import routes
         try:
             from utils import format_gold_quantity
             app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
-        except:
-            pass
-        import routes
+        except Exception as template_error:
+            logging.error(f"Template function registration failed: {template_error}")
+        try:
+            import routes
+            logging.info("Routes imported in fallback mode")
+        except Exception as route_error:
+            logging.error(f"Route import failed: {route_error}")
         return app
 
 # Register template functions globally before app initialization
