@@ -163,12 +163,14 @@ def purchase():
                 
             purchase_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             total_cost = gold_amount_k * unit_price  # Calculate cost based on k amount and price per k
+            # Convert unit_price to per-gram for consistent storage
+            unit_price_per_gram = unit_price / 1000  # Convert price per kilo to price per gram
             
             purchase = Purchase()
             purchase.seller = seller
             purchase.date = purchase_date
             purchase.gold_amount = gold_amount
-            purchase.unit_price = unit_price
+            purchase.unit_price = unit_price_per_gram  # Store as price per gram
             purchase.currency = currency
             purchase.total_cost = total_cost
             purchase.created_by = user.id
@@ -223,10 +225,12 @@ def sale():
                 
             sale_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             total_revenue = gold_amount_k * unit_price  # Calculate revenue based on k amount and price per k
+            # Convert unit_price to per-gram for consistent storage
+            unit_price_per_gram = unit_price / 1000  # Convert price per kilo to price per gram
             
             sale = Sale()
             sale.gold_amount = gold_amount
-            sale.unit_price = unit_price
+            sale.unit_price = unit_price_per_gram  # Store as price per gram
             sale.total_revenue = total_revenue
             sale.date = sale_date
             sale.created_by = user.id
