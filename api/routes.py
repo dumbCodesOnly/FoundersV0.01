@@ -363,9 +363,16 @@ def reset_database():
     
     try:
         # Clear all data tables (but preserve structure)
-        from .models import Purchase, Sale, ExchangeRate, User
+        from .models import Purchase, Sale, ExchangeRate, User, Settings
         
-        # Delete all purchases and sales
+        # Count records for logging
+        purchases_count = Purchase.query.count()
+        sales_count = Sale.query.count()
+        exchange_rates_count = ExchangeRate.query.count()
+        users_count = User.query.filter(User.telegram_id != app.config['BOT_OWNER_ID']).count()
+        settings_count = Settings.query.count()
+        
+        # Delete all transaction data
         Purchase.query.delete()
         Sale.query.delete()
         ExchangeRate.query.delete()
@@ -373,10 +380,13 @@ def reset_database():
         # Delete all users except the bot owner
         User.query.filter(User.telegram_id != app.config['BOT_OWNER_ID']).delete()
         
+        # Delete all settings (complete reset)
+        Settings.query.delete()
+        
         db.session.commit()
         
-        logging.info(f"Database reset performed by bot owner: {session.get('telegram_id')}")
-        flash('Database successfully reset. All transaction data cleared, user data cleared (except bot owner).', 'success')
+        logging.info(f"Full database reset performed by bot owner: {session.get('telegram_id')} - Deleted {purchases_count} purchases, {sales_count} sales, {exchange_rates_count} exchange rates, {users_count} users, {settings_count} settings")
+        flash(f'Database completely reset. Deleted {purchases_count} purchases, {sales_count} sales, {exchange_rates_count} exchange rates, {users_count} users, and {settings_count} settings. Only bot owner account preserved.', 'success')
         
     except Exception as e:
         db.session.rollback()
@@ -399,10 +409,10 @@ def reset_transactions():
         return redirect(url_for('admin'))
     
     try:
-        # Clear only transaction data (but preserve structure and users)
+        # Clear only transaction data (but preserve structure, users, and settings)
         from .models import Purchase, Sale, ExchangeRate
         
-        # Delete all purchases and sales only
+        # Delete all purchases and sales only (preserve users and settings)
         purchases_count = Purchase.query.count()
         sales_count = Sale.query.count()
         exchange_rates_count = ExchangeRate.query.count()
@@ -414,7 +424,7 @@ def reset_transactions():
         db.session.commit()
         
         logging.info(f"Transaction reset performed by bot owner: {session.get('telegram_id')} - Deleted {purchases_count} purchases, {sales_count} sales, {exchange_rates_count} exchange rates")
-        flash(f'Transactions successfully reset. Deleted {purchases_count} purchases, {sales_count} sales, and {exchange_rates_count} exchange rates. All users preserved.', 'success')
+        flash(f'Transactions successfully reset. Deleted {purchases_count} purchases, {sales_count} sales, and {exchange_rates_count} exchange rates. All users and system settings preserved.', 'success')
         
     except Exception as e:
         db.session.rollback()

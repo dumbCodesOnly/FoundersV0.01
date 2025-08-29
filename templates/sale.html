@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const taxFeeAmountDisplay = document.getElementById('tax-fee-amount');
     const netRevenueDisplay = document.getElementById('net-revenue');
     
-    const taxFeePercentage = {{ tax_fee_percentage|default(0) }};
+    const taxFeePercentage = {{ tax_fee_percentage|default(0)|tojson }};
 
     function updateRevenue() {
         const goldAmount = parseFloat(goldAmountInput.value) || 0;
