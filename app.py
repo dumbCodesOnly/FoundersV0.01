@@ -86,12 +86,20 @@ def init_database():
         else:
             logging.info("Using SQLite database (development)")
         
-        # Test database connection
-        result = db.session.execute(db.text("SELECT 1")).scalar()
-        if result == 1:
-            logging.info("Database connection test successful")
-        else:
-            logging.warning("Database connection test returned unexpected result")
+        # Test database connection with retry for serverless
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = db.session.execute(db.text("SELECT 1")).scalar()
+                if result == 1:
+                    logging.info(f"Database connection test successful (attempt {attempt + 1})")
+                    break
+                else:
+                    logging.warning(f"Database connection test returned unexpected result (attempt {attempt + 1})")
+            except Exception as conn_error:
+                logging.warning(f"Database connection attempt {attempt + 1} failed: {conn_error}")
+                if attempt == max_retries - 1:
+                    raise
         
         # Create default bot owner if specified
         if app.config['BOT_OWNER_ID'] > 0:
@@ -118,6 +126,8 @@ def init_database():
 # Initialize database and routes
 def create_app():
     """Create and configure the Flask application"""
+    environment = detect_environment()
+    
     try:
         # Import utils for template functions first
         from utils import format_gold_quantity
@@ -126,25 +136,42 @@ def create_app():
         app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
         
         with app.app_context():
-            init_database()
+            # For Vercel, be more conservative with database initialization
+            if environment == 'vercel':
+                logging.info("Initializing database for Vercel environment")
+                try:
+                    init_database()
+                except Exception as db_error:
+                    logging.error(f"Database initialization failed in Vercel: {db_error}")
+                    # Don't fail the entire app if DB fails in serverless
+                    pass
+            else:
+                init_database()
             
             # Import routes after database initialization
             import routes
+            logging.info("Routes imported successfully")
+        
         return app
+        
     except Exception as e:
         logging.error(f"App initialization error: {e}")
         logging.error(f"App initialization traceback: {traceback.format_exc()}")
+        
         # Fallback - still register template function and import routes
         try:
             from utils import format_gold_quantity
             app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+            logging.info("Template functions registered in fallback mode")
         except Exception as template_error:
             logging.error(f"Template function registration failed: {template_error}")
+        
         try:
             import routes
             logging.info("Routes imported in fallback mode")
         except Exception as route_error:
             logging.error(f"Route import failed: {route_error}")
+        
         return app
 
 # Register template functions globally before app initialization
@@ -155,17 +182,36 @@ try:
 except Exception as e:
     logging.error(f"Failed to register template functions: {e}")
 
-# Initialize the app for both environments
-try:
-    if database_url:
-        # Production environment (Vercel with DATABASE_URL)
-        logging.info("Initializing app for production (Vercel)")
-        create_app()
+# Environment detection for consistent behavior
+def detect_environment():
+    """Detect if running in Vercel, Replit, or other environment"""
+    if os.environ.get('VERCEL'):
+        return 'vercel'
+    elif os.environ.get('REPLIT_ENVIRONMENT'):
+        return 'replit' 
+    elif database_url and database_url.startswith('postgresql'):
+        return 'production'
     else:
-        # Development environment (Replit)
-        logging.info("Initializing app for development (Replit)")
-        create_app()
+        return 'development'
+
+environment = detect_environment()
+logging.info(f"Detected environment: {environment}")
+
+# Initialize the app based on environment
+try:
+    if environment in ['vercel', 'production']:
+        logging.info(f"Initializing app for {environment}")
+        # For serverless environments, ensure minimal initialization
+        app_instance = create_app()
+    else:
+        logging.info(f"Initializing app for {environment}")
+        app_instance = create_app()
 except Exception as e:
     logging.error(f"Critical app initialization error: {e}")
-    # For production, we still need to initialize routes even if DB fails
-    import routes
+    logging.error(f"Initialization traceback: {traceback.format_exc()}")
+    # For serverless, we still need to initialize routes
+    try:
+        import routes
+        logging.info("Routes imported in fallback mode")
+    except Exception as route_error:
+        logging.error(f"Route import failed: {route_error}")
