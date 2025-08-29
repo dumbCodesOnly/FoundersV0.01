@@ -195,6 +195,8 @@ def init_database():
         # Create default bot owner if specified
         if app.config['BOT_OWNER_ID'] > 0:
             logging.info(f"Checking for bot owner with ID: {app.config['BOT_OWNER_ID']}")
+            # Import models in local scope to ensure it's available
+            from . import models
             existing_owner = models.User.query.filter_by(telegram_id=app.config['BOT_OWNER_ID']).first()
             if not existing_owner:
                 owner = models.User()
@@ -341,3 +343,25 @@ except Exception as e:
 # Ensure app is available at module level for Vercel imports
 if app_instance:
     app = app_instance
+    # Debug app instance for Vercel compatibility
+    logging.debug(f"Final app instance type: {type(app)}")
+    logging.debug(f"App instance is Flask app: {hasattr(app, 'wsgi_app')}")
+    logging.debug(f"App wsgi_app type: {type(getattr(app, 'wsgi_app', None))}")
+    
+    # Verify app is properly configured for WSGI
+    if hasattr(app, '__call__'):
+        logging.debug("App is callable (WSGI compatible)")
+    else:
+        logging.error("CRITICAL: App is not callable - WSGI incompatible!")
+        
+    # Check if there are any proxy middleware issues
+    if hasattr(app, 'wsgi_app'):
+        logging.debug(f"WSGI app middleware stack: {type(app.wsgi_app)}")
+        wsgi_app = app.wsgi_app
+        # Walk the middleware stack
+        middleware_count = 0
+        current_wsgi = wsgi_app
+        while hasattr(current_wsgi, 'app') and middleware_count < 10:
+            logging.debug(f"Middleware layer {middleware_count}: {type(current_wsgi)}")
+            current_wsgi = getattr(current_wsgi, 'app', current_wsgi)
+            middleware_count += 1
