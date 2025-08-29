@@ -34,6 +34,7 @@ def get_exchange_rates():
     from .app import db
     
     rates = {}
+    usd_to_irr_rate = None
     
     # Try Navasan API for accurate Iranian free market rate (120 free calls/month)
     # Note: Requires API key from @navasan_contact_bot on Telegram
@@ -54,17 +55,19 @@ def get_exchange_rates():
             # Navasan returns rates in Iranian Rial
             if 'usd' in irr_data and 'value' in irr_data['usd']:
                 irr_per_usd = irr_data['usd']['value']
+                usd_to_irr_rate = irr_per_usd
                 # Convert to IRR per CAD (CAD to USD rate ~0.74)
                 irr_per_cad = irr_per_usd * 0.74
                 rates['IRR'] = irr_per_cad
-                logging.info(f"Got IRR rate from Navasan: {irr_per_cad} IRR/CAD (USD rate: {irr_per_usd})")
+                rates['USD_to_IRR'] = irr_per_usd
+                logging.info(f"Got IRR rate from Navasan: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
         elif irr_response.status_code == 429:
             logging.warning("Navasan API rate limit exceeded")
     except Exception as e:
         logging.warning(f"Failed to get IRR rate from Navasan: {e}")
     
     # Try BONBAST as fallback for IRR (if Navasan fails)
-    if 'IRR' not in rates:
+    if 'IRR' not in rates or 'USD_to_IRR' not in rates:
         try:
             # BONBAST provides free market rates
             bonbast_response = requests.get("https://bonbast.com/json", timeout=10)
@@ -73,11 +76,31 @@ def get_exchange_rates():
                 # BONBAST returns rates in different format
                 if 'usd1' in bonbast_data:  # USD sell rate
                     irr_per_usd = float(bonbast_data['usd1'])
+                    usd_to_irr_rate = irr_per_usd
                     irr_per_cad = irr_per_usd * 0.74
                     rates['IRR'] = irr_per_cad
-                    logging.info(f"Got IRR rate from BONBAST: {irr_per_cad} IRR/CAD")
+                    rates['USD_to_IRR'] = irr_per_usd
+                    logging.info(f"Got IRR rate from BONBAST: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
         except Exception as e:
             logging.warning(f"Failed to get IRR rate from BONBAST: {e}")
+    
+    # Try alternative free market IRR APIs if still no USD_to_IRR rate
+    if 'USD_to_IRR' not in rates:
+        try:
+            # Try ExchangeRate-API for USD to IRR
+            exchange_response = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10)
+            if exchange_response.status_code == 200:
+                exchange_data = exchange_response.json()
+                if 'rates' in exchange_data and 'IRR' in exchange_data['rates']:
+                    irr_per_usd = exchange_data['rates']['IRR']
+                    usd_to_irr_rate = irr_per_usd
+                    rates['USD_to_IRR'] = irr_per_usd
+                    # Also update CAD rate if not set
+                    if 'IRR' not in rates:
+                        rates['IRR'] = irr_per_usd * 0.74
+                    logging.info(f"Got USD to IRR rate from ExchangeRate-API: {irr_per_usd}")
+        except Exception as e:
+            logging.warning(f"Failed to get USD to IRR rate from ExchangeRate-API: {e}")
     
     # Get USD rate from exchangerate.host
     try:
@@ -97,28 +120,54 @@ def get_exchange_rates():
         rates['USD'] = 0.74
         logging.info("Using fallback USD rate: 0.74")
     
-    if 'IRR' not in rates:
+    if 'USD_to_IRR' not in rates:
         # Updated fallback rate to realistic 2025 free market rate (~1M IRR/USD)
-        rates['IRR'] = 1014000 * 0.74  # ~750,000 IRR/CAD
-        logging.info(f"Using fallback IRR rate: {rates['IRR']} (based on ~1,014,000 IRR/USD free market rate)")
+        fallback_usd_to_irr = 1014000  # NIMA/free market rate
+        rates['USD_to_IRR'] = fallback_usd_to_irr
+        usd_to_irr_rate = fallback_usd_to_irr
+        logging.info(f"Using fallback USD to IRR rate: {fallback_usd_to_irr} (NIMA/free market rate)")
+    
+    if 'IRR' not in rates:
+        # Calculate IRR/CAD from USD/IRR rate
+        irr_per_cad = usd_to_irr_rate * 0.74 if usd_to_irr_rate else 750360
+        rates['IRR'] = irr_per_cad
+        logging.info(f"Calculated IRR/CAD rate: {irr_per_cad}")
     
     # Update database with fetched rates
     try:
         for currency, rate in rates.items():
-            existing_rate = ExchangeRate.query.filter_by(
-                from_currency='CAD', 
-                to_currency=currency
-            ).first()
-            
-            if existing_rate:
-                existing_rate.rate = rate
-                existing_rate.updated_at = datetime.utcnow()
+            if currency == 'USD_to_IRR':
+                # Store USD to IRR rate
+                existing_rate = ExchangeRate.query.filter_by(
+                    from_currency='USD', 
+                    to_currency='IRR'
+                ).first()
+                
+                if existing_rate:
+                    existing_rate.rate = rate
+                    existing_rate.updated_at = datetime.utcnow()
+                else:
+                    new_rate = ExchangeRate()
+                    new_rate.from_currency = 'USD'
+                    new_rate.to_currency = 'IRR'
+                    new_rate.rate = rate
+                    db.session.add(new_rate)
             else:
-                new_rate = ExchangeRate()
-                new_rate.from_currency = 'CAD'
-                new_rate.to_currency = currency
-                new_rate.rate = rate
-                db.session.add(new_rate)
+                # Store CAD-based rates
+                existing_rate = ExchangeRate.query.filter_by(
+                    from_currency='CAD', 
+                    to_currency=currency
+                ).first()
+                
+                if existing_rate:
+                    existing_rate.rate = rate
+                    existing_rate.updated_at = datetime.utcnow()
+                else:
+                    new_rate = ExchangeRate()
+                    new_rate.from_currency = 'CAD'
+                    new_rate.to_currency = currency
+                    new_rate.rate = rate
+                    db.session.add(new_rate)
         
         db.session.commit()
         logging.info(f"Updated exchange rates in database: {rates}")
@@ -151,15 +200,35 @@ def convert_currency(amount, from_currency, to_currency):
         if rate:
             return amount / rate.rate
     
+    # Try USD to IRR direct conversion
+    if from_currency == 'USD' and to_currency == 'IRR':
+        rate = ExchangeRate.query.filter_by(
+            from_currency='USD',
+            to_currency='IRR'
+        ).first()
+        if rate:
+            return amount * rate.rate
+    elif from_currency == 'IRR' and to_currency == 'USD':
+        rate = ExchangeRate.query.filter_by(
+            from_currency='USD',
+            to_currency='IRR'
+        ).first()
+        if rate:
+            return amount / rate.rate
+    
     # Default conversions if no rate found
     if from_currency == 'CAD' and to_currency == 'USD':
         return amount * 0.74
     elif from_currency == 'CAD' and to_currency == 'IRR':
-        return amount * 42000
+        return amount * 750360  # Updated realistic rate
     elif from_currency == 'USD' and to_currency == 'CAD':
         return amount * 1.35
+    elif from_currency == 'USD' and to_currency == 'IRR':
+        return amount * 1014000  # NIMA/free market rate
     elif from_currency == 'IRR' and to_currency == 'CAD':
-        return amount / 42000
+        return amount / 750360
+    elif from_currency == 'IRR' and to_currency == 'USD':
+        return amount / 1014000
     else:
         return amount
 
