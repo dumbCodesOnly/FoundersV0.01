@@ -5,39 +5,78 @@ from models import ExchangeRate, Purchase, Sale
 from app import db
 
 def get_exchange_rates():
-    """Fetch live exchange rates from exchangerate.host"""
+    """Fetch live exchange rates from multiple sources"""
+    rates = {}
+    
+    # Try to get IRR rate from priceto.day (free market rate)
     try:
-        # Fetch CAD to USD and IRR rates
-        response = requests.get("https://api.exchangerate.host/latest?base=CAD&symbols=USD,IRR", timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+        }
+        
+        irr_response = requests.get("https://api.priceto.day/v1/latest/irr/usd", 
+                                   headers=headers, timeout=10)
+        if irr_response.status_code == 200:
+            irr_data = irr_response.json()
+            if 'rates' in irr_data and 'USD' in irr_data['rates']:
+                usd_per_irr = irr_data['rates']['USD']
+                # Convert to IRR per CAD (assuming CAD = 0.74 USD)
+                irr_per_cad = (1 / usd_per_irr) * 0.74
+                rates['IRR'] = irr_per_cad
+                logging.info(f"Got IRR rate from priceto.day: {irr_per_cad}")
+    except Exception as e:
+        logging.warning(f"Failed to get IRR rate from priceto.day: {e}")
+    
+    # Get USD rate from exchangerate.host if we don't have it
+    try:
+        response = requests.get("https://api.exchangerate.host/latest?base=CAD&symbols=USD", timeout=10)
         if response.status_code == 200:
             data = response.json()
             if data.get('success', False):
-                rates = data.get('rates', {})
-                
-                # Update or create exchange rates
-                for currency, rate in rates.items():
-                    existing_rate = ExchangeRate.query.filter_by(
-                        from_currency='CAD', 
-                        to_currency=currency
-                    ).first()
-                    
-                    if existing_rate:
-                        existing_rate.rate = rate
-                        existing_rate.updated_at = datetime.utcnow()
-                    else:
-                        new_rate = ExchangeRate()
-                        new_rate.from_currency = 'CAD'
-                        new_rate.to_currency = currency
-                        new_rate.rate = rate
-                        db.session.add(new_rate)
-                
-                db.session.commit()
-                return rates
+                exchange_rates = data.get('rates', {})
+                if 'USD' in exchange_rates:
+                    rates['USD'] = exchange_rates['USD']
+                    logging.info(f"Got USD rate from exchangerate.host: {exchange_rates['USD']}")
     except Exception as e:
-        logging.error(f"Error fetching exchange rates: {e}")
+        logging.warning(f"Failed to get USD rate from exchangerate.host: {e}")
     
-    # Return default rates if API fails
-    return {'USD': 0.74, 'IRR': 42000}
+    # Use fallback rates if APIs fail
+    if 'USD' not in rates:
+        rates['USD'] = 0.74
+        logging.info("Using fallback USD rate: 0.74")
+    
+    if 'IRR' not in rates:
+        rates['IRR'] = 42000
+        logging.info("Using fallback IRR rate: 42000")
+    
+    # Update database with fetched rates
+    try:
+        for currency, rate in rates.items():
+            existing_rate = ExchangeRate.query.filter_by(
+                from_currency='CAD', 
+                to_currency=currency
+            ).first()
+            
+            if existing_rate:
+                existing_rate.rate = rate
+                existing_rate.updated_at = datetime.utcnow()
+            else:
+                new_rate = ExchangeRate()
+                new_rate.from_currency = 'CAD'
+                new_rate.to_currency = currency
+                new_rate.rate = rate
+                db.session.add(new_rate)
+        
+        db.session.commit()
+        logging.info(f"Updated exchange rates in database: {rates}")
+    except Exception as e:
+        logging.error(f"Error updating exchange rates in database: {e}")
+    
+    return rates
 
 def convert_currency(amount, from_currency, to_currency):
     """Convert amount from one currency to another"""

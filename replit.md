@@ -43,7 +43,8 @@ Preferred communication style: Simple, everyday language.
 # External Dependencies
 
 ## Third-party Services
-- **ExchangeRate.host API**: Live currency conversion rates for CAD/USD/IRR pairs
+- **PriceToDay API**: Free market Iranian Rial (IRR) exchange rates via https://api.priceto.day/v1/latest/irr/usd
+- **ExchangeRate.host API**: Live currency conversion rates for CAD/USD pairs (fallback for IRR)
 - **Telegram WebApp API**: User authentication and app integration within Telegram ecosystem
 
 ## Frontend Libraries
