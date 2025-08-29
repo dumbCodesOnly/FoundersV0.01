@@ -17,52 +17,82 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 
+# Environment detection for consistent behavior
+def detect_environment():
+    """Detect if running in Vercel, Replit, or other environment"""
+    if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
+        return 'vercel'
+    elif os.environ.get('REPLIT_ENVIRONMENT'):
+        return 'replit' 
+    elif os.environ.get('DATABASE_URL', '').startswith('postgresql'):
+        return 'production'
+    else:
+        return 'development'
+
 # Create the app with proper template and static paths for Vercel
 template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
 static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, instance_relative_config=False)
-app.secret_key = os.getenv("SESSION_SECRET") or os.getenv("SECRET_KEY")
-if not app.secret_key:
-    raise ValueError("SESSION_SECRET or SECRET_KEY environment variable is required for security.")
+
+environment = detect_environment()
+app.secret_key = os.getenv("SESSION_SECRET") or os.getenv("SECRET_KEY") or "dev-session-secret-key-change-for-production"
+if environment in ['vercel', 'production'] and app.secret_key == "dev-session-secret-key-change-for-production":
+    raise ValueError("SESSION_SECRET or SECRET_KEY environment variable is required for production security.")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure the database - Use Neon PostgreSQL for production
+# Configure the database - Use SQLite for development, PostgreSQL for production
 database_url = os.getenv("DATABASE_URL")
+
+# For development/Replit, use SQLite if no DATABASE_URL is provided
 if not database_url:
-    raise ValueError("DATABASE_URL environment variable is required. Please set up your Neon PostgreSQL database.")
+    if environment in ['replit', 'development']:
+        database_url = "sqlite:///founders_management.db"
+        logging.info("Using SQLite database for development")
+    else:
+        raise ValueError("DATABASE_URL environment variable is required for production.")
 
-# Ensure we're using PostgreSQL (Neon)
-if not database_url.startswith("postgresql"):
-    raise ValueError("DATABASE_URL must be a PostgreSQL connection string. SQLite is not supported in production.")
+# Allow both SQLite and PostgreSQL based on environment
+if environment in ['replit', 'development'] and not database_url.startswith(("postgresql", "sqlite")):
+    # Default to SQLite for development
+    database_url = "sqlite:///founders_management.db"
+elif environment in ['vercel', 'production'] and not database_url.startswith("postgresql"):
+    raise ValueError("DATABASE_URL must be a PostgreSQL connection string for production environments.")
 
-# Configure for Neon PostgreSQL with optimized settings
+# Configure database settings based on environment
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 
-# Extract SSL mode from database URL - Neon requires SSL
-ssl_mode = "require"
-if "sslmode=require" in database_url:
+if database_url.startswith("postgresql"):
+    # PostgreSQL/Neon configuration
     ssl_mode = "require"
-elif "sslmode=prefer" in database_url:
-    ssl_mode = "prefer"
-elif "sslmode=disable" in database_url:
-    ssl_mode = "disable"
+    if "sslmode=require" in database_url:
+        ssl_mode = "require"
+    elif "sslmode=prefer" in database_url:
+        ssl_mode = "prefer"
+    elif "sslmode=disable" in database_url:
+        ssl_mode = "disable"
 
-# Neon-optimized connection settings for serverless
-connect_args = {
-    "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
-    "sslmode": ssl_mode,
-    "application_name": os.getenv("APP_NAME", "founders-management")
-}
+    # PostgreSQL connection settings
+    connect_args = {
+        "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+        "sslmode": ssl_mode,
+        "application_name": os.getenv("APP_NAME", "founders-management")
+    }
 
-# Engine options optimized for Neon and Vercel serverless
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_size": int(os.getenv("DB_POOL_SIZE", "1")),  # Smaller pool for serverless
-    "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "300")),
-    "pool_pre_ping": True,
-    "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "10")),  # Shorter timeout for serverless
-    "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "0")),
-    "connect_args": connect_args
-}
+    # Engine options optimized for PostgreSQL
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "1")),  # Smaller pool for serverless
+        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "300")),
+        "pool_pre_ping": True,
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "10")),  # Shorter timeout for serverless
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "0")),
+        "connect_args": connect_args
+    }
+else:
+    # SQLite configuration for development
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
 
 # Disable SQLAlchemy modifications tracking to save memory
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -192,18 +222,6 @@ try:
     logging.info("Template functions registered successfully")
 except Exception as e:
     logging.error(f"Failed to register template functions: {e}")
-
-# Environment detection for consistent behavior
-def detect_environment():
-    """Detect if running in Vercel, Replit, or other environment"""
-    if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
-        return 'vercel'
-    elif os.environ.get('REPLIT_ENVIRONMENT'):
-        return 'replit' 
-    elif database_url and database_url.startswith('postgresql'):
-        return 'production'
-    else:
-        return 'development'
 
 environment = detect_environment()
 logging.info(f"Detected environment: {environment}")
