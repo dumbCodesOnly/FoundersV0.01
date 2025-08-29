@@ -21,40 +21,48 @@ db = SQLAlchemy(model_class=Base)
 template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
 static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, instance_relative_config=False)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+app.secret_key = os.getenv("SESSION_SECRET") or os.getenv("SECRET_KEY")
+if not app.secret_key:
+    raise ValueError("SESSION_SECRET or SECRET_KEY environment variable is required for security.")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure the database
-database_url = os.environ.get("DATABASE_URL")
-if database_url and database_url.startswith("postgresql"):
-    # PostgreSQL environment - adjust SSL mode based on URL
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-    
-    # Extract SSL mode from database URL or default to disable for Replit
+# Configure the database - Use Neon PostgreSQL for production
+database_url = os.getenv("DATABASE_URL")
+if not database_url:
+    raise ValueError("DATABASE_URL environment variable is required. Please set up your Neon PostgreSQL database.")
+
+# Ensure we're using PostgreSQL (Neon)
+if not database_url.startswith("postgresql"):
+    raise ValueError("DATABASE_URL must be a PostgreSQL connection string. SQLite is not supported in production.")
+
+# Configure for Neon PostgreSQL with optimized settings
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+
+# Extract SSL mode from database URL - Neon requires SSL
+ssl_mode = "require"
+if "sslmode=require" in database_url:
+    ssl_mode = "require"
+elif "sslmode=prefer" in database_url:
+    ssl_mode = "prefer"
+elif "sslmode=disable" in database_url:
     ssl_mode = "disable"
-    if "sslmode=require" in database_url:
-        ssl_mode = "require"
-    elif "sslmode=prefer" in database_url:
-        ssl_mode = "prefer"
-    elif "sslmode=disable" in database_url:
-        ssl_mode = "disable"
-    
-    connect_args = {"connect_timeout": 10}
-    if ssl_mode != "disable":
-        connect_args["sslmode"] = ssl_mode
-    
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_size": 5,
-        "pool_recycle": 300,
-        "pool_pre_ping": True,
-        "pool_timeout": 20,
-        "max_overflow": 0,
-        "connect_args": connect_args
-    }
-else:
-    # Development environment (no PostgreSQL) - use SQLite
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///founders_management.db"
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
+
+# Neon-optimized connection settings for serverless
+connect_args = {
+    "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+    "sslmode": ssl_mode,
+    "application_name": os.getenv("APP_NAME", "founders-management")
+}
+
+# Engine options optimized for Neon and Vercel serverless
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_size": int(os.getenv("DB_POOL_SIZE", "1")),  # Smaller pool for serverless
+    "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "300")),
+    "pool_pre_ping": True,
+    "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "10")),  # Shorter timeout for serverless
+    "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "0")),
+    "connect_args": connect_args
+}
 
 # Disable SQLAlchemy modifications tracking to save memory
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -62,11 +70,12 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # Initialize the app with the extension
 db.init_app(app)
 
-# App configuration
+# App configuration using environment variables
 app.config.update(
-    TELEGRAM_BOT_TOKEN=os.environ.get("TELEGRAM_BOT_TOKEN", ""),
-    BOT_OWNER_ID=int(os.environ.get("BOT_OWNER_ID", "0")),
-    DEBUG=True
+    TELEGRAM_BOT_TOKEN=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+    BOT_OWNER_ID=int(os.getenv("BOT_OWNER_ID", "0")),
+    DEBUG=os.getenv("DEBUG", "False").lower() in ("true", "1", "yes"),
+    ENV=os.getenv("FLASK_ENV", "production")
 )
 
 # Initialize database and create tables
