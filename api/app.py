@@ -8,7 +8,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging with more detailed format for debugging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # More verbose logging for debugging
     format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
 )
 
@@ -101,11 +101,36 @@ else:
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize the app with the extension
-db.init_app(app)
+logging.debug("Initializing SQLAlchemy with Flask app...")
+try:
+    db.init_app(app)
+    logging.debug("SQLAlchemy initialization successful")
+except Exception as init_error:
+    logging.error(f"SQLAlchemy init_app failed: {init_error}")
+    logging.error(f"SQLAlchemy init traceback: {traceback.format_exc()}")
+    if 'issubclass' in str(init_error).lower():
+        logging.error("DETECTED: issubclass() error during SQLAlchemy initialization!")
+    raise
 
 # Import models here to avoid circular imports
-with app.app_context():
-    from . import models
+logging.debug("Starting model import process...")
+try:
+    with app.app_context():
+        logging.debug("App context established, importing models...")
+        from . import models
+        logging.debug("Models imported successfully")
+        
+        # Debug: Check if models are properly defined classes
+        logging.debug(f"User model type: {type(models.User)}")
+        logging.debug(f"User model MRO: {models.User.__mro__ if hasattr(models.User, '__mro__') else 'No MRO'}")
+        logging.debug(f"Purchase model type: {type(models.Purchase)}")
+        logging.debug(f"Sale model type: {type(models.Sale)}")
+        logging.debug(f"ExchangeRate model type: {type(models.ExchangeRate)}")
+        
+except Exception as model_import_error:
+    logging.error(f"CRITICAL: Model import failed: {model_import_error}")
+    logging.error(f"Model import error traceback: {traceback.format_exc()}")
+    raise
 
 # App configuration using environment variables
 app.config.update(
@@ -119,11 +144,31 @@ app.config.update(
 def init_database():
     """Initialize database tables and create default admin user"""
     try:
+        logging.debug("Starting database initialization...")
         logging.info("Models already imported")
         
-        # Create all tables
-        db.create_all()
-        logging.info("Database tables created successfully")
+        # Debug: Check database and model registry state
+        logging.debug(f"Database instance: {db}")
+        logging.debug(f"Database models registry: {list(db.Model.registry._class_registry.keys()) if hasattr(db.Model, 'registry') else 'No registry found'}")
+        
+        # Create all tables with detailed error handling
+        logging.debug("Calling db.create_all()...")
+        try:
+            db.create_all()
+            logging.info("Database tables created successfully")
+        except Exception as create_tables_error:
+            logging.error(f"db.create_all() failed: {create_tables_error}")
+            logging.error(f"Create tables traceback: {traceback.format_exc()}")
+            if 'issubclass' in str(create_tables_error).lower():
+                logging.error("DETECTED: issubclass() error during db.create_all()!")
+                logging.debug("Checking model classes before create_all...")
+                from . import models
+                for model_name in ['User', 'Purchase', 'Sale', 'ExchangeRate']:
+                    model_class = getattr(models, model_name, None)
+                    logging.debug(f"{model_name} class: {model_class}")
+                    logging.debug(f"{model_name} type: {type(model_class)}")
+                    logging.debug(f"{model_name} is class: {isinstance(model_class, type) if model_class else 'None'}")
+            raise
         
         # Log database connection info (without credentials)
         db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
@@ -168,18 +213,48 @@ def init_database():
     except Exception as e:
         logging.error(f"Database initialization error: {e}")
         logging.error(f"Database error traceback: {traceback.format_exc()}")
+        
+        # Check if this is the issubclass error
+        if 'issubclass' in str(e).lower():
+            logging.error("DETECTED: issubclass() error in database initialization!")
+            logging.debug("Attempting to diagnose issubclass error...")
+            
+            # Try to import models individually to isolate the problem
+            try:
+                from . import models
+                logging.debug("Models module imported successfully during error handling")
+                
+                # Check each model class individually
+                for model_name in ['User', 'Purchase', 'Sale', 'ExchangeRate']:
+                    try:
+                        model_class = getattr(models, model_name, None)
+                        if model_class:
+                            logging.debug(f"{model_name}: {model_class} (type: {type(model_class)})")
+                            logging.debug(f"{model_name} bases: {getattr(model_class, '__bases__', 'No bases')}")
+                            logging.debug(f"{model_name} mro: {getattr(model_class, '__mro__', 'No MRO')}")
+                        else:
+                            logging.error(f"{model_name} is None!")
+                    except Exception as model_check_error:
+                        logging.error(f"Error checking {model_name}: {model_check_error}")
+            except Exception as models_import_error:
+                logging.error(f"Failed to import models during error diagnosis: {models_import_error}")
 
 # Initialize database and routes
 def create_app():
     """Create and configure the Flask application"""
     environment = detect_environment()
+    logging.debug(f"Creating app for environment: {environment}")
     
     try:
         # Import utils for template functions first
+        logging.debug("Importing utils for template functions...")
         from .utils import format_gold_quantity
+        logging.debug("Utils imported successfully")
         
         # Make format function available in templates
+        logging.debug("Registering template functions...")
         app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+        logging.debug("Template functions registered")
         
         with app.app_context():
             # For Vercel, be more conservative with database initialization
@@ -195,32 +270,52 @@ def create_app():
                 init_database()
             
             # Import routes after database initialization to avoid circular imports
+            logging.debug("Importing routes...")
             from . import routes
             logging.info("Routes imported successfully")
+            logging.debug(f"Number of registered routes: {len(app.url_map._rules)}")
         
         return app
         
     except Exception as e:
-        logging.error(f"App initialization error: {e}")
+        logging.error(f"CRITICAL: App initialization error: {e}")
         logging.error(f"App initialization traceback: {traceback.format_exc()}")
+        
+        # Enhanced debug information
+        logging.debug(f"Error type: {type(e).__name__}")
+        logging.debug(f"Error args: {e.args}")
+        
+        # Check if this is the issubclass error we're looking for
+        if 'issubclass' in str(e).lower():
+            logging.error("DETECTED: issubclass() error in app initialization!")
+            logging.debug(f"App state: {vars(app) if hasattr(app, '__dict__') else 'No app dict'}")
+            logging.debug(f"DB state: {vars(db) if hasattr(db, '__dict__') else 'No db dict'}")
         
         # Fallback - still register template function
         try:
+            logging.debug("Attempting fallback template function registration...")
             from .utils import format_gold_quantity
             app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
             logging.info("Template functions registered in fallback mode")
         except Exception as template_error:
             logging.error(f"Template function registration failed: {template_error}")
+            logging.error(f"Template error traceback: {traceback.format_exc()}")
         
         return app
 
 # Register template functions globally before app initialization
 try:
+    logging.debug("Attempting early template function registration...")
     from .utils import format_gold_quantity
     app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
     logging.info("Template functions registered successfully")
 except Exception as e:
     logging.error(f"Failed to register template functions: {e}")
+    logging.error(f"Template function error traceback: {traceback.format_exc()}")
+    
+    # Check if this is related to our issubclass error
+    if 'issubclass' in str(e).lower():
+        logging.error("DETECTED: issubclass() error in template function registration!")
 
 environment = detect_environment()
 logging.info(f"Detected environment: {environment}")
