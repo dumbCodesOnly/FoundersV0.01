@@ -5,8 +5,9 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Set Vercel environment variable for proper detection
+# Set Vercel environment variables for proper detection
 os.environ['VERCEL'] = '1'
+os.environ['VERCEL_ENV'] = 'production'
 
 try:
     logger.info("Starting Vercel import process...")

@@ -187,7 +187,7 @@ except Exception as e:
 # Environment detection for consistent behavior
 def detect_environment():
     """Detect if running in Vercel, Replit, or other environment"""
-    if os.environ.get('VERCEL'):
+    if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
         return 'vercel'
     elif os.environ.get('REPLIT_ENVIRONMENT'):
         return 'replit' 
