@@ -17,8 +17,10 @@ try:
     
     logger.info("Flask app imported successfully in Vercel")
     
-    # Export the application for Vercel
+    # Export the application for Vercel (multiple export names for compatibility)
     application = app
+    handler = app  # For Vercel serverless functions
+    app = app      # For Vercel WSGI apps
     
     logger.info("WSGI application configured for Vercel")
     
@@ -28,9 +30,9 @@ except Exception as e:
     
     # Fallback app for debugging
     from flask import Flask, jsonify
-    application = Flask(__name__)
+    fallback_app = Flask(__name__)
     
-    @application.route('/')
+    @fallback_app.route('/')
     def error_info():
         return jsonify({
             'error': 'App import failed in Vercel',
@@ -39,12 +41,17 @@ except Exception as e:
             'files_in_dir': os.listdir(os.path.dirname(os.path.abspath(__file__)))
         }), 500
     
-    @application.route('/debug')
+    @fallback_app.route('/debug')
     def debug_info():
         return jsonify({
             'current_dir': os.path.dirname(os.path.abspath(__file__)),
             'python_version': __import__('sys').version,
             'environment_vars': {k: v for k, v in os.environ.items() if not k.startswith('_')},
         })
+    
+    # Export fallback app with multiple names for Vercel
+    application = fallback_app
+    handler = fallback_app
+    app = fallback_app
     
     logger.info("Fallback error app created for Vercel")
