@@ -58,8 +58,16 @@ def telegram_auth():
             user.last_name = user_data.get('last_name', '')
             user.username = user_data.get('username', '')
             user.photo_url = user_data.get('photo_url', '')
-            user.is_whitelisted = False
-            user.is_admin = False
+            
+            # Auto-whitelist and grant admin privileges to bot owner
+            if telegram_id == app.config['BOT_OWNER_ID']:
+                user.is_whitelisted = True
+                user.is_admin = True
+                logging.info(f"Auto-whitelisted bot owner: {telegram_id}")
+            else:
+                user.is_whitelisted = False
+                user.is_admin = False
+            
             db.session.add(user)
         else:
             # Update existing user info
@@ -67,6 +75,13 @@ def telegram_auth():
             user.last_name = user_data.get('last_name', user.last_name)
             user.username = user_data.get('username', user.username)
             user.photo_url = user_data.get('photo_url', user.photo_url)
+            
+            # Ensure bot owner always has admin privileges and is whitelisted
+            if telegram_id == app.config['BOT_OWNER_ID']:
+                if not user.is_whitelisted or not user.is_admin:
+                    user.is_whitelisted = True
+                    user.is_admin = True
+                    logging.info(f"Updated bot owner privileges: {telegram_id}")
         
         user.last_login = datetime.utcnow()
         db.session.commit()
