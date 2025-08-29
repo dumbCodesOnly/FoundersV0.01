@@ -36,15 +36,14 @@ def telegram_auth():
         
         if not user:
             # Create new user
-            user = User(
-                telegram_id=telegram_id,
-                first_name=user_data.get('first_name', ''),
-                last_name=user_data.get('last_name', ''),
-                username=user_data.get('username', ''),
-                photo_url=user_data.get('photo_url', ''),
-                is_whitelisted=False,
-                is_admin=False
-            )
+            user = User()
+            user.telegram_id = telegram_id
+            user.first_name = user_data.get('first_name', '')
+            user.last_name = user_data.get('last_name', '')
+            user.username = user_data.get('username', '')
+            user.photo_url = user_data.get('photo_url', '')
+            user.is_whitelisted = False
+            user.is_admin = False
             db.session.add(user)
         else:
             # Update existing user info
@@ -126,18 +125,21 @@ def purchase():
                 flash('All fields are required and amounts must be positive', 'error')
                 return render_template('purchase.html', user=user)
             
+            if not date_str:
+                flash('Date is required', 'error')
+                return render_template('purchase.html', user=user)
+                
             purchase_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             total_cost = gold_amount * unit_price
             
-            purchase = Purchase(
-                seller=seller,
-                date=purchase_date,
-                gold_amount=gold_amount,
-                unit_price=unit_price,
-                currency=currency,
-                total_cost=total_cost,
-                created_by=user.id
-            )
+            purchase = Purchase()
+            purchase.seller = seller
+            purchase.date = purchase_date
+            purchase.gold_amount = gold_amount
+            purchase.unit_price = unit_price
+            purchase.currency = currency
+            purchase.total_cost = total_cost
+            purchase.created_by = user.id
             
             db.session.add(purchase)
             db.session.commit()
@@ -182,16 +184,19 @@ def sale():
                 flash(f'Cannot sell {gold_amount}g. Only {available_inventory:.2f}g available.', 'error')
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
             
+            if not date_str:
+                flash('Date is required', 'error')
+                return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
+                
             sale_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             total_revenue = gold_amount * unit_price
             
-            sale = Sale(
-                gold_amount=gold_amount,
-                unit_price=unit_price,
-                total_revenue=total_revenue,
-                date=sale_date,
-                created_by=user.id
-            )
+            sale = Sale()
+            sale.gold_amount = gold_amount
+            sale.unit_price = unit_price
+            sale.total_revenue = total_revenue
+            sale.date = sale_date
+            sale.created_by = user.id
             
             db.session.add(sale)
             db.session.commit()

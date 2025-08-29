@@ -53,14 +53,13 @@ with app.app_context():
     if app.config['BOT_OWNER_ID'] > 0:
         existing_owner = models.User.query.filter_by(telegram_id=app.config['BOT_OWNER_ID']).first()
         if not existing_owner:
-            owner = models.User(
-                telegram_id=app.config['BOT_OWNER_ID'],
-                first_name="Bot",
-                last_name="Owner",
-                username="bot_owner",
-                is_admin=True,
-                is_whitelisted=True
-            )
+            owner = models.User()
+            owner.telegram_id = app.config['BOT_OWNER_ID']
+            owner.first_name = "Bot"
+            owner.last_name = "Owner" 
+            owner.username = "bot_owner"
+            owner.is_admin = True
+            owner.is_whitelisted = True
             db.session.add(owner)
             db.session.commit()
             logging.info(f"Created bot owner with ID: {app.config['BOT_OWNER_ID']}")

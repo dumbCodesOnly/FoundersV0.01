@@ -25,11 +25,10 @@ def get_exchange_rates():
                         existing_rate.rate = rate
                         existing_rate.updated_at = datetime.utcnow()
                     else:
-                        new_rate = ExchangeRate(
-                            from_currency='CAD',
-                            to_currency=currency,
-                            rate=rate
-                        )
+                        new_rate = ExchangeRate()
+                        new_rate.from_currency = 'CAD'
+                        new_rate.to_currency = currency
+                        new_rate.rate = rate
                         db.session.add(new_rate)
                 
                 db.session.commit()
@@ -62,14 +61,16 @@ def convert_currency(amount, from_currency, to_currency):
             return amount / rate.rate
     
     # Default conversions if no rate found
-    conversions = {
-        ('CAD', 'USD'): 0.74,
-        ('CAD', 'IRR'): 42000,
-        ('USD', 'CAD'): 1.35,
-        ('IRR', 'CAD'): 1/42000
-    }
-    
-    return amount * conversions.get((from_currency, to_currency), 1)
+    if from_currency == 'CAD' and to_currency == 'USD':
+        return amount * 0.74
+    elif from_currency == 'CAD' and to_currency == 'IRR':
+        return amount * 42000
+    elif from_currency == 'USD' and to_currency == 'CAD':
+        return amount * 1.35
+    elif from_currency == 'IRR' and to_currency == 'CAD':
+        return amount / 42000
+    else:
+        return amount
 
 def calculate_inventory_and_profit():
     """Calculate remaining inventory and profit using FIFO method"""
