@@ -48,8 +48,8 @@ try:
         id = db.Column(db.Integer, primary_key=True)
         seller = db.Column(db.String(200), nullable=False)
         date = db.Column(db.Date, nullable=False)
-        gold_amount = db.Column(db.Float, nullable=False)  # in grams
-        unit_price = db.Column(db.Float, nullable=False)   # price per gram
+        gold_amount = db.Column(db.Integer, nullable=False)  # WoW gold tokens (e.g., 50000 for 50k)
+        unit_price = db.Column(db.Float, nullable=False)   # price per 1000 gold tokens
         currency = db.Column(db.String(3), nullable=False, default='CAD')  # CAD or IRR
         total_cost = db.Column(db.Float, nullable=False)
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -59,7 +59,7 @@ try:
         creator = db.relationship('User', backref='purchases')
         
         def __repr__(self):
-            return f'<Purchase {self.id}: {self.gold_amount}g @ {self.unit_price} {self.currency}>'
+            return f'<Purchase {self.id}: {self.gold_amount} gold @ {self.unit_price} {self.currency}/1k>'
 
     logging.debug("Purchase model defined successfully")
 except Exception as purchase_model_error:
@@ -72,8 +72,8 @@ try:
     class Sale(db.Model):
         __tablename__ = 'sale'
         id = db.Column(db.Integer, primary_key=True)
-        gold_amount = db.Column(db.Float, nullable=False)  # in grams
-        unit_price = db.Column(db.Float, nullable=False)   # price per gram in CAD
+        gold_amount = db.Column(db.Integer, nullable=False)  # WoW gold tokens (e.g., 40000 for 40k)
+        unit_price = db.Column(db.Float, nullable=False)   # price per 1000 gold tokens in CAD
         total_revenue = db.Column(db.Float, nullable=False)
         date = db.Column(db.Date, nullable=False)
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -83,7 +83,7 @@ try:
         creator = db.relationship('User', backref='sales')
         
         def __repr__(self):
-            return f'<Sale {self.id}: {self.gold_amount}g @ {self.unit_price} CAD>'
+            return f'<Sale {self.id}: {self.gold_amount} gold @ {self.unit_price} CAD/1k>'
 
     logging.debug("Sale model defined successfully")
 except Exception as sale_model_error:

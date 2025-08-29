@@ -170,7 +170,7 @@
                             </div>
                             <div class="text-right">
                                 <p class="text-sm font-semibold">{{ format_gold_quantity(purchase.gold_amount) }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ "{:.2f}".format(purchase.unit_price * 1000) }} {{ purchase.currency }}/k</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">${{ "{:.2f}".format(purchase.unit_price) }} {{ purchase.currency }}/1k</p>
                             </div>
                         </div>
                     </div>
@@ -212,7 +212,7 @@
                             </div>
                             <div class="text-right">
                                 <p class="text-sm font-semibold">{{ format_gold_quantity(sale.gold_amount) }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">${{ "{:.2f}".format(sale.unit_price * 1000) }} CAD/k</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">${{ "{:.2f}".format(sale.unit_price) }} CAD/1k</p>
                             </div>
                         </div>
                     </div>

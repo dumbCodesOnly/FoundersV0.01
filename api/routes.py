@@ -149,8 +149,8 @@ def purchase():
             seller = request.form.get('seller', '').strip()
             date_str = request.form.get('date')
             gold_amount_k = float(request.form.get('gold_amount', 0))
-            gold_amount = gold_amount_k * 1000  # Convert k format to actual amount
-            unit_price = float(request.form.get('unit_price', 0))
+            gold_amount = int(gold_amount_k * 1000)  # Convert k format to actual WoW gold tokens
+            unit_price = float(request.form.get('unit_price', 0))  # Price per 1000 gold tokens
             currency = request.form.get('currency', 'CAD')
             
             if not all([seller, date_str, gold_amount_k > 0, unit_price > 0]):
@@ -162,15 +162,13 @@ def purchase():
                 return render_template('purchase.html', user=user)
                 
             purchase_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            total_cost = gold_amount_k * unit_price  # Calculate cost based on k amount and price per k
-            # Convert unit_price to per-gram for consistent storage
-            unit_price_per_gram = unit_price / 1000  # Convert price per kilo to price per gram
+            total_cost = gold_amount_k * unit_price  # Calculate total cost based on k amount and price per 1k tokens
             
             purchase = Purchase()
             purchase.seller = seller
             purchase.date = purchase_date
-            purchase.gold_amount = gold_amount
-            purchase.unit_price = unit_price_per_gram  # Store as price per gram
+            purchase.gold_amount = gold_amount  # Store as total gold tokens
+            purchase.unit_price = unit_price  # Store as price per 1000 tokens
             purchase.currency = currency
             purchase.total_cost = total_cost
             purchase.created_by = user.id
@@ -178,7 +176,7 @@ def purchase():
             db.session.add(purchase)
             db.session.commit()
             
-            flash(f'Purchase recorded: {gold_amount_k}k gold from {seller}', 'success')
+            flash(f'Purchase recorded: {gold_amount_k}k WoW gold from {seller}', 'success')
             return redirect(url_for('dashboard'))
             
         except ValueError as e:
@@ -207,8 +205,8 @@ def sale():
     if request.method == 'POST':
         try:
             gold_amount_k = float(request.form.get('gold_amount', 0))
-            gold_amount = gold_amount_k * 1000  # Convert k format to actual amount
-            unit_price = float(request.form.get('unit_price', 0))
+            gold_amount = int(gold_amount_k * 1000)  # Convert k format to actual WoW gold tokens
+            unit_price = float(request.form.get('unit_price', 0))  # Price per 1000 gold tokens
             date_str = request.form.get('date')
             
             if not all([gold_amount_k > 0, unit_price > 0, date_str]):
@@ -216,7 +214,7 @@ def sale():
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
             
             if gold_amount > available_inventory:
-                flash(f'Cannot sell {gold_amount_k}k gold. Only {available_inventory/1000:.1f}k available.', 'error')
+                flash(f'Cannot sell {gold_amount_k}k WoW gold. Only {available_inventory/1000:.1f}k available.', 'error')
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
             
             if not date_str:
@@ -224,13 +222,11 @@ def sale():
                 return render_template('sale.html', user=user, available_inventory=available_inventory, today=date.today().isoformat())
                 
             sale_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            total_revenue = gold_amount_k * unit_price  # Calculate revenue based on k amount and price per k
-            # Convert unit_price to per-gram for consistent storage
-            unit_price_per_gram = unit_price / 1000  # Convert price per kilo to price per gram
+            total_revenue = gold_amount_k * unit_price  # Calculate total revenue based on k amount and price per 1k tokens
             
             sale = Sale()
-            sale.gold_amount = gold_amount
-            sale.unit_price = unit_price_per_gram  # Store as price per gram
+            sale.gold_amount = gold_amount  # Store as total gold tokens
+            sale.unit_price = unit_price  # Store as price per 1000 tokens
             sale.total_revenue = total_revenue
             sale.date = sale_date
             sale.created_by = user.id
@@ -238,7 +234,7 @@ def sale():
             db.session.add(sale)
             db.session.commit()
             
-            flash(f'Sale recorded: {gold_amount_k}k gold for ${total_revenue:.2f} CAD', 'success')
+            flash(f'Sale recorded: {gold_amount_k}k WoW gold for ${total_revenue:.2f} CAD', 'success')
             return redirect(url_for('dashboard'))
             
         except ValueError as e:

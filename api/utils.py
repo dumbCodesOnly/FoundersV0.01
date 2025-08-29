@@ -285,7 +285,7 @@ def convert_currency(amount, from_currency, to_currency):
         return amount
 
 def calculate_inventory_and_profit():
-    """Calculate remaining inventory and profit using FIFO method"""
+    """Calculate remaining WoW gold inventory and profit using FIFO method"""
     # Late imports to avoid circular dependency
     from .models import Purchase, Sale
     
@@ -297,15 +297,16 @@ def calculate_inventory_and_profit():
     total_purchase_cost_cad = 0
     
     for purchase in purchases:
-        cost_per_gram_cad = purchase.unit_price
+        # Convert price per 1k tokens to cost per token in CAD
+        cost_per_token_cad = purchase.unit_price / 1000  # price per 1k to price per 1 token
         if purchase.currency == 'IRR':
-            cost_per_gram_cad = convert_currency(purchase.unit_price, 'IRR', 'CAD')
+            cost_per_token_cad = convert_currency(purchase.unit_price, 'IRR', 'CAD') / 1000
         
         inventory_queue.append({
-            'amount': purchase.gold_amount,
-            'cost_per_gram': cost_per_gram_cad
+            'amount': purchase.gold_amount,  # WoW gold tokens
+            'cost_per_token': cost_per_token_cad  # Cost per single token in CAD
         })
-        total_purchase_cost_cad += purchase.gold_amount * cost_per_gram_cad
+        total_purchase_cost_cad += purchase.gold_amount * cost_per_token_cad
     
     # Process sales using FIFO
     total_sales_revenue = sum(sale.total_revenue for sale in sales)
@@ -319,18 +320,18 @@ def calculate_inventory_and_profit():
             
             if batch['amount'] <= remaining_to_sell:
                 # Use entire batch
-                total_cost_of_goods_sold += batch['amount'] * batch['cost_per_gram']
+                total_cost_of_goods_sold += batch['amount'] * batch['cost_per_token']
                 remaining_to_sell -= batch['amount']
                 inventory_queue.pop(0)
             else:
                 # Use partial batch
-                total_cost_of_goods_sold += remaining_to_sell * batch['cost_per_gram']
+                total_cost_of_goods_sold += remaining_to_sell * batch['cost_per_token']
                 batch['amount'] -= remaining_to_sell
                 remaining_to_sell = 0
     
     # Calculate remaining inventory
     remaining_inventory = sum(batch['amount'] for batch in inventory_queue)
-    remaining_inventory_value = sum(batch['amount'] * batch['cost_per_gram'] for batch in inventory_queue)
+    remaining_inventory_value = sum(batch['amount'] * batch['cost_per_token'] for batch in inventory_queue)
     
     # Calculate profit
     profit_cad = total_sales_revenue - total_cost_of_goods_sold
@@ -338,7 +339,7 @@ def calculate_inventory_and_profit():
     profit_irr = convert_currency(profit_cad, 'CAD', 'IRR')
     
     return {
-        'remaining_inventory': remaining_inventory,
+        'remaining_inventory': remaining_inventory,  # WoW gold tokens remaining
         'remaining_inventory_value_cad': remaining_inventory_value,
         'total_purchases_cad': total_purchase_cost_cad,
         'total_sales_cad': total_sales_revenue,
