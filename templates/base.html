@@ -88,7 +88,7 @@
                 <i data-feather="minus-circle" class="w-5 h-5"></i>
                 <span class="text-xs mt-1">Sell</span>
             </a>
-            {% if session.is_admin %}
+            {% if session.telegram_id and session.telegram_id == config.BOT_OWNER_ID %}
             <a href="{{ url_for('admin') }}" class="flex flex-col items-center p-2 {{ 'text-telegram-blue' if request.endpoint == 'admin' else 'text-gray-600 dark:text-gray-400' }}">
                 <i data-feather="users" class="w-5 h-5"></i>
                 <span class="text-xs mt-1">Admin</span>

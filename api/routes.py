@@ -248,8 +248,9 @@ def sale():
 
 @app.route('/admin')
 def admin():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Admin access required', 'error')
+    # Only allow actual bot owner to access admin panel
+    if 'telegram_id' not in session or session.get('telegram_id') != app.config['BOT_OWNER_ID']:
+        flash('Bot owner access required', 'error')
         return redirect(url_for('dashboard'))
     
     user = User.query.get(session['user_id'])
@@ -259,8 +260,9 @@ def admin():
 
 @app.route('/admin/whitelist/<int:user_id>/<action>')
 def toggle_whitelist(user_id, action):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Admin access required', 'error')
+    # Only allow actual bot owner to modify whitelist
+    if 'telegram_id' not in session or session.get('telegram_id') != app.config['BOT_OWNER_ID']:
+        flash('Bot owner access required', 'error')
         return redirect(url_for('dashboard'))
     
     target_user = User.query.get(user_id)
