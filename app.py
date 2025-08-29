@@ -98,11 +98,16 @@ def create_app():
         return app
 
 # Initialize the app for both environments
-if database_url:
-    # Production environment (Vercel with DATABASE_URL)
-    logging.info("Initializing app for production (Vercel)")
-    create_app()
-else:
-    # Development environment (Replit)
-    logging.info("Initializing app for development (Replit)")
-    create_app()
+try:
+    if database_url:
+        # Production environment (Vercel with DATABASE_URL)
+        logging.info("Initializing app for production (Vercel)")
+        create_app()
+    else:
+        # Development environment (Replit)
+        logging.info("Initializing app for development (Replit)")
+        create_app()
+except Exception as e:
+    logging.error(f"Critical app initialization error: {e}")
+    # For production, we still need to initialize routes even if DB fails
+    import routes
