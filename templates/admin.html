@@ -40,30 +40,30 @@
             {% if users %}
                 {% for target_user in users %}
                 <div class="p-6">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div class="flex items-center min-w-0 flex-1">
                             {% if target_user.photo_url %}
-                            <img src="{{ target_user.photo_url }}" alt="{{ target_user.full_name }}" class="w-12 h-12 rounded-full mr-4">
+                            <img src="{{ target_user.photo_url }}" alt="{{ target_user.full_name }}" class="w-12 h-12 rounded-full mr-4 flex-shrink-0">
                             {% else %}
-                            <div class="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mr-4">
+                            <div class="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
                                 <span class="text-gray-600 dark:text-gray-300 font-medium">{{ target_user.first_name[0] }}</span>
                             </div>
                             {% endif %}
                             
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ target_user.full_name }}</h3>
-                                <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                                    <span>@{{ target_user.username or 'No username' }}</span>
-                                    <span>ID: {{ target_user.telegram_id }}</span>
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-gray-500 dark:text-gray-400 space-y-1 sm:space-y-0">
+                                    <span class="truncate">@{{ target_user.username or 'No username' }}</span>
+                                    <span class="truncate">ID: {{ target_user.telegram_id }}</span>
                                     {% if target_user.last_login %}
-                                    <span>Last seen: {{ target_user.last_login.strftime('%Y-%m-%d %H:%M') }}</span>
+                                    <span class="truncate">Last seen: {{ target_user.last_login.strftime('%Y-%m-%d %H:%M') }}</span>
                                     {% else %}
-                                    <span>Never logged in</span>
+                                    <span class="truncate">Never logged in</span>
                                     {% endif %}
                                 </div>
                                 
                                 <!-- Badges -->
-                                <div class="flex items-center space-x-2 mt-2">
+                                <div class="flex flex-wrap items-center gap-2 mt-2">
                                     {% if target_user.is_admin or target_user.telegram_id == config.BOT_OWNER_ID %}
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
                                         <i data-feather="crown" class="w-3 h-3 mr-1"></i>
@@ -94,23 +94,24 @@
                         </div>
                         
                         <!-- Actions -->
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center justify-end flex-shrink-0">
                             {% if target_user.is_whitelisted %}
                                 {% if target_user.telegram_id != config.BOT_OWNER_ID %}
                                 <a href="{{ url_for('toggle_whitelist', user_id=target_user.id, action='remove') }}" 
-                                   class="bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded-lg text-sm font-medium dark:bg-red-900/50 dark:text-red-200 dark:hover:bg-red-900/70"
+                                   class="bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded-lg text-sm font-medium dark:bg-red-900/50 dark:text-red-200 dark:hover:bg-red-900/70 whitespace-nowrap"
                                    onclick="return confirm('Remove {{ target_user.full_name }} from whitelist?')">
                                     <i data-feather="user-minus" class="w-4 h-4 mr-1 inline"></i>
                                     Remove
                                 </a>
                                 {% else %}
-                                <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-lg text-sm font-medium dark:bg-gray-700 dark:text-gray-400">
+                                <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-lg text-sm font-medium dark:bg-gray-700 dark:text-gray-400 whitespace-nowrap">
+                                    <i data-feather="shield" class="w-4 h-4 mr-1 inline"></i>
                                     Protected
                                 </span>
                                 {% endif %}
                             {% else %}
                             <a href="{{ url_for('toggle_whitelist', user_id=target_user.id, action='add') }}" 
-                               class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded-lg text-sm font-medium dark:bg-green-900/50 dark:text-green-200 dark:hover:bg-green-900/70">
+                               class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded-lg text-sm font-medium dark:bg-green-900/50 dark:text-green-200 dark:hover:bg-green-900/70 whitespace-nowrap">
                                 <i data-feather="user-plus" class="w-4 h-4 mr-1 inline"></i>
                                 Add to Whitelist
                             </a>
