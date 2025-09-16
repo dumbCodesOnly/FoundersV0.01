@@ -44,6 +44,32 @@ def format_gold_quantity(amount):
     except (ValueError, TypeError):
         return "0"
 
+def format_currency(amount, currency='CAD'):
+    """Format currency amount with proper currency symbol"""
+    try:
+        if amount is None:
+            amount = 0
+        
+        amount = float(amount)
+        
+        if currency == 'IRR':
+            # Iranian Rial - use rial symbol and no decimals for large amounts
+            if amount >= 10000:
+                return f"{amount:,.0f} ﷼"
+            else:
+                return f"{amount:.1f} ﷼"
+        elif currency == 'CAD':
+            # Canadian Dollar
+            return f"${amount:,.2f} CAD"
+        elif currency == 'USD':
+            # US Dollar
+            return f"${amount:,.2f} USD"
+        else:
+            # Default fallback
+            return f"${amount:,.2f} {currency}"
+    except (ValueError, TypeError):
+        return f"0 {currency}"
+
 def get_exchange_rates():
     """Fetch live exchange rates from multiple sources with accurate Iranian Rial rates"""
     # Check cache first (cache for 15 minutes to avoid repeated API calls)

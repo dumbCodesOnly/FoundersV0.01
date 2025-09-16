@@ -52,6 +52,7 @@ try:
         unit_price = db.Column(db.Float, nullable=False)   # price per 1000 gold tokens
         currency = db.Column(db.String(3), nullable=False, default='CAD')  # CAD or IRR
         total_cost = db.Column(db.Float, nullable=False)
+        cad_rate = db.Column(db.Float, nullable=True)  # CAD to local currency rate at purchase time
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
         created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
         
