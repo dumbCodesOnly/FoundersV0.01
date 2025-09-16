@@ -179,23 +179,106 @@ def get_exchange_rates():
 
     # Skip ExchangeRate-API as it only provides official rates (~42,000), not free market rates
     
-    # Get USD rate from exchangerate.host
+    # Get CAD to USD rate from multiple reliable free sources
+    # Try exchangerates-api.io first (free, no API key required)
     try:
-        response = requests.get("https://api.exchangerate.host/latest?base=CAD&symbols=USD", timeout=10)
+        response = requests.get("https://api.exchangerates-api.io/v1/latest?base=CAD&symbols=USD", timeout=10)
         if response.status_code == 200:
             data = response.json()
-            if data.get('success', False):
+            if data.get('success', True) and 'rates' in data:
                 exchange_rates = data.get('rates', {})
                 if 'USD' in exchange_rates:
-                    rates['USD'] = exchange_rates['USD']
-                    logging.info(f"Got USD rate from exchangerate.host: {exchange_rates['USD']}")
+                    usd_rate = float(exchange_rates['USD'])
+                    if 0.65 <= usd_rate <= 0.85:  # Validate reasonable range
+                        rates['USD'] = usd_rate
+                        logging.info(f"Got USD rate from exchangerates-api.io: {usd_rate}")
+                    else:
+                        logging.warning(f"USD rate from exchangerates-api.io out of range: {usd_rate}")
     except Exception as e:
-        logging.warning(f"Failed to get USD rate from exchangerate.host: {e}")
+        logging.warning(f"Failed to get USD rate from exchangerates-api.io: {e}")
+    
+    # Try exchangerate.host as backup (fixed URL encoding)
+    if 'USD' not in rates:
+        try:
+            url = "https://api.exchangerate.host/latest"
+            params = {"base": "CAD", "symbols": "USD"}
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                logging.debug(f"exchangerate.host response: {data}")
+                if data.get('success', True) and 'rates' in data:
+                    exchange_rates = data.get('rates', {})
+                    if 'USD' in exchange_rates:
+                        usd_rate = float(exchange_rates['USD'])
+                        if 0.65 <= usd_rate <= 0.85:  # Validate reasonable range
+                            rates['USD'] = usd_rate
+                            logging.info(f"Got USD rate from exchangerate.host: {usd_rate}")
+                        else:
+                            logging.warning(f"USD rate from exchangerate.host out of range: {usd_rate}")
+        except Exception as e:
+            logging.warning(f"Failed to get USD rate from exchangerate.host: {e}")
+    
+    # Try Bank of Canada as backup (official rates)
+    if 'USD' not in rates:
+        try:
+            response = requests.get("https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?recent=1", timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if 'observations' in data and len(data['observations']) > 0:
+                    # Bank of Canada returns USD/CAD rate, so we need to invert it for CAD/USD
+                    usd_cad_rate = float(data['observations'][0]['FXUSDCAD']['v'])
+                    if usd_cad_rate > 0:
+                        cad_usd_rate = 1 / usd_cad_rate
+                        if 0.65 <= cad_usd_rate <= 0.85:  # Validate reasonable range
+                            rates['USD'] = cad_usd_rate
+                            logging.info(f"Got USD rate from Bank of Canada: {cad_usd_rate}")
+        except Exception as e:
+            logging.warning(f"Failed to get USD rate from Bank of Canada: {e}")
+    
+    # Try ECB (European Central Bank) as another backup
+    if 'USD' not in rates:
+        try:
+            response = requests.get("https://api.exchangerate.host/latest?base=USD&symbols=CAD", timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success', True) and 'rates' in data:
+                    exchange_rates = data.get('rates', {})
+                    if 'CAD' in exchange_rates:
+                        # This gives us USD to CAD, so invert for CAD to USD
+                        usd_cad_rate = float(exchange_rates['CAD'])
+                        if usd_cad_rate > 0:
+                            cad_usd_rate = 1 / usd_cad_rate
+                            if 0.65 <= cad_usd_rate <= 0.85:  # Validate reasonable range
+                                rates['USD'] = cad_usd_rate
+                                logging.info(f"Got USD rate from ECB (inverted): {cad_usd_rate}")
+        except Exception as e:
+            logging.warning(f"Failed to get USD rate from ECB: {e}")
     
     # Use REALISTIC fallback rates if APIs fail (updated for 2025)
     if 'USD' not in rates:
-        rates['USD'] = 0.74
-        logging.info("Using fallback USD rate: 0.74")
+        # Try to get the most recent rate from database first
+        try:
+            from .models import ExchangeRate
+            recent_usd_rate = ExchangeRate.query.filter_by(
+                from_currency='CAD', 
+                to_currency='USD'
+            ).order_by(ExchangeRate.updated_at.desc()).first()
+            
+            if recent_usd_rate and recent_usd_rate.updated_at:
+                # Use database rate if it's less than 24 hours old
+                time_diff = datetime.utcnow() - recent_usd_rate.updated_at
+                if time_diff.total_seconds() < 86400:  # 24 hours
+                    rates['USD'] = recent_usd_rate.rate
+                    logging.info(f"Using recent database USD rate: {recent_usd_rate.rate}")
+                else:
+                    rates['USD'] = 0.74
+                    logging.info("Using fallback USD rate: 0.74 (database rate too old)")
+            else:
+                rates['USD'] = 0.74
+                logging.info("Using fallback USD rate: 0.74 (no database rate found)")
+        except Exception as e:
+            rates['USD'] = 0.74
+            logging.info(f"Using fallback USD rate: 0.74 (database error: {e})")
     
     if 'USD_to_IRR' not in rates:
         # Updated fallback rate to realistic 2025 free market rate (~1M IRR/USD)
@@ -257,48 +340,81 @@ def get_exchange_rates():
     return rates
 
 def convert_currency(amount, from_currency, to_currency):
-    """Convert amount from one currency to another"""
+    """Convert amount from one currency to another using live rates from database first"""
     if from_currency == to_currency:
         return amount
     
     # Late import to avoid circular dependency
     from .models import ExchangeRate
     
-    # Get exchange rate from database
+    # Priority 1: Get live exchange rate from database (most recent)
     if from_currency == 'CAD':
         rate = ExchangeRate.query.filter_by(
             from_currency='CAD',
             to_currency=to_currency
-        ).first()
+        ).order_by(ExchangeRate.updated_at.desc()).first()
         if rate:
+            logging.debug(f"Using database rate CAD->{to_currency}: {rate.rate}")
             return amount * rate.rate
     elif to_currency == 'CAD':
         rate = ExchangeRate.query.filter_by(
             from_currency='CAD',
             to_currency=from_currency
-        ).first()
+        ).order_by(ExchangeRate.updated_at.desc()).first()
         if rate:
+            logging.debug(f"Using database rate {from_currency}->CAD: {1/rate.rate}")
             return amount / rate.rate
     
-    # Try USD to IRR direct conversion
+    # Priority 2: Try USD to IRR direct conversion from database
     if from_currency == 'USD' and to_currency == 'IRR':
         rate = ExchangeRate.query.filter_by(
             from_currency='USD',
             to_currency='IRR'
-        ).first()
+        ).order_by(ExchangeRate.updated_at.desc()).first()
         if rate:
+            logging.debug(f"Using database rate USD->IRR: {rate.rate}")
             return amount * rate.rate
     elif from_currency == 'IRR' and to_currency == 'USD':
         rate = ExchangeRate.query.filter_by(
             from_currency='USD',
             to_currency='IRR'
-        ).first()
+        ).order_by(ExchangeRate.updated_at.desc()).first()
         if rate:
+            logging.debug(f"Using database rate IRR->USD: {1/rate.rate}")
             return amount / rate.rate
     
-    # Default conversions if no rate found
+    # Priority 3: Try cross-currency conversion through database rates
+    if from_currency == 'USD' and to_currency == 'CAD':
+        # Get CAD->USD rate and invert it
+        cad_usd_rate = ExchangeRate.query.filter_by(
+            from_currency='CAD',
+            to_currency='USD'
+        ).order_by(ExchangeRate.updated_at.desc()).first()
+        if cad_usd_rate:
+            usd_cad_rate = 1 / cad_usd_rate.rate
+            logging.debug(f"Using inverted database rate USD->CAD: {usd_cad_rate}")
+            return amount * usd_cad_rate
+    
+    # Priority 4: Fresh API call if no database rates available
+    logging.debug(f"No database rate found for {from_currency}->{to_currency}, refreshing rates")
+    fresh_rates = get_exchange_rates()
+    
+    # Try with fresh rates
+    if from_currency == 'CAD' and to_currency in fresh_rates:
+        logging.debug(f"Using fresh rate CAD->{to_currency}: {fresh_rates[to_currency]}")
+        return amount * fresh_rates[to_currency]
+    elif from_currency == 'USD' and to_currency == 'IRR' and 'USD_to_IRR' in fresh_rates:
+        logging.debug(f"Using fresh rate USD->IRR: {fresh_rates['USD_to_IRR']}")
+        return amount * fresh_rates['USD_to_IRR']
+    elif from_currency == 'USD' and to_currency == 'CAD' and 'USD' in fresh_rates:
+        usd_cad_rate = 1 / fresh_rates['USD']
+        logging.debug(f"Using fresh inverted rate USD->CAD: {usd_cad_rate}")
+        return amount * usd_cad_rate
+    
+    # Priority 5: Fallback to realistic static rates (only as last resort)
+    logging.warning(f"Using fallback conversion for {from_currency}->{to_currency}")
     if from_currency == 'CAD' and to_currency == 'USD':
-        return amount * 0.74
+        return amount * 0.74  # Conservative fallback
     elif from_currency == 'CAD' and to_currency == 'IRR':
         return amount * 750360  # Updated realistic rate
     elif from_currency == 'USD' and to_currency == 'CAD':
