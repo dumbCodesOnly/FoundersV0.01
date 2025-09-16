@@ -164,18 +164,22 @@ def init_database():
             db.create_all()
             logging.info("Database tables created successfully")
         except Exception as create_tables_error:
-            logging.error(f"db.create_all() failed: {create_tables_error}")
-            logging.error(f"Create tables traceback: {traceback.format_exc()}")
-            if 'issubclass' in str(create_tables_error).lower():
-                logging.error("DETECTED: issubclass() error during db.create_all()!")
-                logging.debug("Checking model classes before create_all...")
-                from . import models
-                for model_name in ['User', 'Purchase', 'Sale', 'ExchangeRate']:
-                    model_class = getattr(models, model_name, None)
-                    logging.debug(f"{model_name} class: {model_class}")
-                    logging.debug(f"{model_name} type: {type(model_class)}")
-                    logging.debug(f"{model_name} is class: {isinstance(model_class, type) if model_class else 'None'}")
-            raise
+            error_str = str(create_tables_error).lower()
+            if 'duplicate key' in error_str or 'already exists' in error_str:
+                logging.info("Database tables already exist - skipping creation")
+            else:
+                logging.error(f"db.create_all() failed: {create_tables_error}")
+                logging.error(f"Create tables traceback: {traceback.format_exc()}")
+                if 'issubclass' in error_str:
+                    logging.error("DETECTED: issubclass() error during db.create_all()!")
+                    logging.debug("Checking model classes before create_all...")
+                    from . import models
+                    for model_name in ['User', 'Purchase', 'Sale', 'ExchangeRate']:
+                        model_class = getattr(models, model_name, None)
+                        logging.debug(f"{model_name} class: {model_class}")
+                        logging.debug(f"{model_name} type: {type(model_class)}")
+                        logging.debug(f"{model_name} is class: {isinstance(model_class, type) if model_class else 'None'}")
+                raise
         
         # Log database connection info (without credentials)
         db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
