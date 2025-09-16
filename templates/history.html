@@ -106,13 +106,13 @@
                                     {{ format_gold_quantity(transaction.gold_amount) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                    ${{ "{:.2f}".format(transaction.unit_price) }} {{ transaction.currency }}/1k
+                                    {{ format_currency(transaction.unit_price, transaction.currency) }}/1k
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold">
                                     {% if transaction.type == 'purchase' %}
-                                    <span class="text-red-600 dark:text-red-400">-${{ "{:.2f}".format(transaction.total_amount) }} {{ transaction.currency }}</span>
+                                    <span class="text-red-600 dark:text-red-400">-{{ format_currency(transaction.total_amount, transaction.currency) }}</span>
                                     {% else %}
-                                    <span class="text-green-600 dark:text-green-400">+${{ "{:.2f}".format(transaction.total_amount) }} CAD</span>
+                                    <span class="text-green-600 dark:text-green-400">+{{ format_currency(transaction.total_amount, 'CAD') }}</span>
                                     {% endif %}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -162,16 +162,16 @@
                                 </p>
                                 <p class="text-sm font-semibold">
                                     {% if transaction.type == 'purchase' %}
-                                    <span class="text-red-600 dark:text-red-400">-${{ "{:.2f}".format(transaction.total_amount) }}</span>
+                                    <span class="text-red-600 dark:text-red-400">-{{ format_currency(transaction.total_amount, transaction.currency) }}</span>
                                     {% else %}
-                                    <span class="text-green-600 dark:text-green-400">+${{ "{:.2f}".format(transaction.total_amount) }}</span>
+                                    <span class="text-green-600 dark:text-green-400">+{{ format_currency(transaction.total_amount, 'CAD') }}</span>
                                     {% endif %}
                                 </p>
                             </div>
                             
                             <div class="mt-1 flex items-center justify-between">
                                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                                    {{ format_gold_quantity(transaction.gold_amount) }} @ ${{ "{:.2f}".format(transaction.unit_price) }}/1k
+                                    {{ format_gold_quantity(transaction.gold_amount) }} @ {{ format_currency(transaction.unit_price, transaction.currency) }}/1k
                                 </p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
                                     {{ transaction.date.strftime('%m/%d/%y') }}
