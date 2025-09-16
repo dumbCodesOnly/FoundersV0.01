@@ -164,6 +164,7 @@ function initializeTelegramIntegration() {
             break;
             
         case '/admin':
+        case '/history':
             tg.showBackButton();
             break;
             

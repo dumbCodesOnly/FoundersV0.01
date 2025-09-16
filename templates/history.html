@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Transaction History - Founders Management{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold mb-2">Transaction History</h1>
+            <p class="text-gray-600 dark:text-gray-400">View all your gold trading transactions</p>
+        </div>
+        <div class="flex items-center space-x-2 mt-4 sm:mt-0">
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ total_transactions }} total transactions</span>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+        <form method="GET" class="space-y-4 sm:space-y-0 sm:flex sm:items-end sm:space-x-4">
+            <!-- Transaction Type Filter -->
+            <div class="flex-1">
+                <label for="type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transaction Type</label>
+                <select name="type" id="type" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-telegram-blue focus:ring-telegram-blue">
+                    <option value="all" {{ 'selected' if transaction_type == 'all' else '' }}>All Transactions</option>
+                    <option value="purchase" {{ 'selected' if transaction_type == 'purchase' else '' }}>Purchases Only</option>
+                    <option value="sale" {{ 'selected' if transaction_type == 'sale' else '' }}>Sales Only</option>
+                </select>
+            </div>
+
+            <!-- Date From -->
+            <div class="flex-1">
+                <label for="date_from" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">From Date</label>
+                <input type="date" name="date_from" id="date_from" value="{{ date_from or '' }}" 
+                       class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-telegram-blue focus:ring-telegram-blue">
+            </div>
+
+            <!-- Date To -->
+            <div class="flex-1">
+                <label for="date_to" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To Date</label>
+                <input type="date" name="date_to" id="date_to" value="{{ date_to or '' }}" 
+                       class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-telegram-blue focus:ring-telegram-blue">
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="flex space-x-2">
+                <button type="submit" class="bg-telegram-blue text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center">
+                    <i data-feather="filter" class="w-4 h-4 mr-2"></i>
+                    Filter
+                </button>
+                <a href="{{ url_for('history') }}" class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center">
+                    <i data-feather="x" class="w-4 h-4 mr-2"></i>
+                    Clear
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Transactions List -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        {% if transactions %}
+            <!-- Desktop View -->
+            <div class="hidden sm:block">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Details</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">By</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            {% for transaction in transactions %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        {% if transaction.type == 'purchase' %}
+                                        <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center mr-3">
+                                            <i data-feather="plus-circle" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+                                        </div>
+                                        <span class="text-sm font-medium text-blue-600 dark:text-blue-400">Purchase</span>
+                                        {% else %}
+                                        <div class="w-8 h-8 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mr-3">
+                                            <i data-feather="minus-circle" class="w-4 h-4 text-green-600 dark:text-green-400"></i>
+                                        </div>
+                                        <span class="text-sm font-medium text-green-600 dark:text-green-400">Sale</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                    {{ transaction.date.strftime('%Y-%m-%d') }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                    {% if transaction.type == 'purchase' %}
+                                        {{ transaction.seller }}
+                                    {% else %}
+                                        Gold Sale
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    {{ format_gold_quantity(transaction.gold_amount) }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                    ${{ "{:.2f}".format(transaction.unit_price) }} {{ transaction.currency }}/1k
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                                    {% if transaction.type == 'purchase' %}
+                                    <span class="text-red-600 dark:text-red-400">-${{ "{:.2f}".format(transaction.total_amount) }} {{ transaction.currency }}</span>
+                                    {% else %}
+                                    <span class="text-green-600 dark:text-green-400">+${{ "{:.2f}".format(transaction.total_amount) }} CAD</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        {% if transaction.creator.photo_url %}
+                                        <img src="{{ transaction.creator.photo_url }}" alt="{{ transaction.creator.full_name }}" class="w-6 h-6 rounded-full mr-2">
+                                        {% else %}
+                                        <div class="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center mr-2">
+                                            <span class="text-xs font-medium text-gray-600 dark:text-gray-300">{{ transaction.creator.first_name[0] }}</span>
+                                        </div>
+                                        {% endif %}
+                                        <span class="text-sm text-gray-900 dark:text-gray-100">{{ transaction.creator.full_name }}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mobile View -->
+            <div class="sm:hidden divide-y divide-gray-200 dark:divide-gray-700">
+                {% for transaction in transactions %}
+                <div class="p-4">
+                    <div class="flex items-start space-x-3">
+                        <!-- Transaction Type Icon -->
+                        {% if transaction.type == 'purchase' %}
+                        <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center flex-shrink-0">
+                            <i data-feather="plus-circle" class="w-5 h-5 text-blue-600 dark:text-blue-400"></i>
+                        </div>
+                        {% else %}
+                        <div class="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center flex-shrink-0">
+                            <i data-feather="minus-circle" class="w-5 h-5 text-green-600 dark:text-green-400"></i>
+                        </div>
+                        {% endif %}
+
+                        <!-- Transaction Details -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between">
+                                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    {% if transaction.type == 'purchase' %}
+                                    <span class="text-blue-600 dark:text-blue-400">Purchase</span> from {{ transaction.seller }}
+                                    {% else %}
+                                    <span class="text-green-600 dark:text-green-400">Sale</span> of Gold
+                                    {% endif %}
+                                </p>
+                                <p class="text-sm font-semibold">
+                                    {% if transaction.type == 'purchase' %}
+                                    <span class="text-red-600 dark:text-red-400">-${{ "{:.2f}".format(transaction.total_amount) }}</span>
+                                    {% else %}
+                                    <span class="text-green-600 dark:text-green-400">+${{ "{:.2f}".format(transaction.total_amount) }}</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            
+                            <div class="mt-1 flex items-center justify-between">
+                                <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    {{ format_gold_quantity(transaction.gold_amount) }} @ ${{ "{:.2f}".format(transaction.unit_price) }}/1k
+                                </p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    {{ transaction.date.strftime('%m/%d/%y') }}
+                                </p>
+                            </div>
+                            
+                            <div class="mt-2 flex items-center">
+                                {% if transaction.creator.photo_url %}
+                                <img src="{{ transaction.creator.photo_url }}" alt="{{ transaction.creator.full_name }}" class="w-4 h-4 rounded-full mr-1">
+                                {% else %}
+                                <div class="w-4 h-4 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center mr-1">
+                                    <span class="text-xs font-medium text-gray-600 dark:text-gray-300">{{ transaction.creator.first_name[0] }}</span>
+                                </div>
+                                {% endif %}
+                                <span class="text-xs text-gray-500 dark:text-gray-400">by {{ transaction.creator.full_name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <!-- Empty State -->
+            <div class="p-12 text-center">
+                <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-feather="archive" class="w-8 h-8 text-gray-400 dark:text-gray-500"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No transactions found</h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">
+                    {% if transaction_type == 'purchase' %}
+                    No purchases match your criteria.
+                    {% elif transaction_type == 'sale' %}
+                    No sales match your criteria.
+                    {% else %}
+                    No transactions match your criteria or you haven't made any transactions yet.
+                    {% endif %}
+                </p>
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <a href="{{ url_for('purchase') }}" class="bg-telegram-blue text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center justify-center">
+                        <i data-feather="plus" class="w-4 h-4 mr-2"></i>
+                        New Purchase
+                    </a>
+                    <a href="{{ url_for('sale') }}" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center">
+                        <i data-feather="trending-up" class="w-4 h-4 mr-2"></i>
+                        New Sale
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="flex items-center justify-between mt-6">
+        <div class="flex items-center">
+            <span class="text-sm text-gray-700 dark:text-gray-300">
+                Showing page {{ page }} of {{ total_pages }}
+            </span>
+        </div>
+        <div class="flex items-center space-x-2">
+            {% if has_prev %}
+            <a href="{{ url_for('history', page=page-1, type=transaction_type, date_from=date_from, date_to=date_to) }}" 
+               class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-2 rounded-lg text-sm flex items-center">
+                <i data-feather="chevron-left" class="w-4 h-4 mr-1"></i>
+                Previous
+            </a>
+            {% endif %}
+            
+            {% if has_next %}
+            <a href="{{ url_for('history', page=page+1, type=transaction_type, date_from=date_from, date_to=date_to) }}" 
+               class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-2 rounded-lg text-sm flex items-center">
+                Next
+                <i data-feather="chevron-right" class="w-4 h-4 ml-1"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-submit form when filter options change
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('type');
+    const dateFromInput = document.getElementById('date_from');
+    const dateToInput = document.getElementById('date_to');
+    
+    // Auto-submit on type change (but not on mobile to avoid accidental submissions)
+    if (window.innerWidth > 640) {
+        typeSelect.addEventListener('change', function() {
+            this.form.submit();
+        });
+    }
+});
+</script>
+{% endblock %}

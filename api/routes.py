@@ -588,6 +588,110 @@ def update_settings():
     
     return redirect(url_for('admin'))
 
+@app.route('/history')
+def history():
+    """Transaction history page showing all purchases and sales"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get current user (using cache for performance)
+    from .utils import get_user_from_session
+    user = get_user_from_session(session)
+    if not user or not user.is_whitelisted:
+        flash('Access denied', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = 20  # Show 20 transactions per page
+    
+    # Get filter parameters
+    transaction_type = request.args.get('type', 'all')  # all, purchase, sale
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    
+    # Base queries
+    purchases_query = Purchase.query
+    sales_query = Sale.query
+    
+    # Apply date filters if provided
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            purchases_query = purchases_query.filter(Purchase.date >= date_from_obj)
+            sales_query = sales_query.filter(Sale.date >= date_from_obj)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            purchases_query = purchases_query.filter(Purchase.date <= date_to_obj)
+            sales_query = sales_query.filter(Sale.date <= date_to_obj)
+        except ValueError:
+            pass
+    
+    # Get transactions based on filter
+    transactions = []
+    
+    if transaction_type in ['all', 'purchase']:
+        purchases = purchases_query.order_by(Purchase.created_at.desc()).all()
+        for purchase in purchases:
+            transactions.append({
+                'type': 'purchase',
+                'id': purchase.id,
+                'date': purchase.date,
+                'created_at': purchase.created_at,
+                'gold_amount': purchase.gold_amount,
+                'unit_price': purchase.unit_price,
+                'currency': purchase.currency,
+                'total_amount': purchase.total_cost,
+                'seller': purchase.seller,
+                'creator': purchase.creator
+            })
+    
+    if transaction_type in ['all', 'sale']:
+        sales = sales_query.order_by(Sale.created_at.desc()).all()
+        for sale in sales:
+            transactions.append({
+                'type': 'sale',
+                'id': sale.id,
+                'date': sale.date,
+                'created_at': sale.created_at,
+                'gold_amount': sale.gold_amount,
+                'unit_price': sale.unit_price,
+                'currency': 'CAD',
+                'total_amount': sale.total_revenue,
+                'seller': None,
+                'creator': sale.creator
+            })
+    
+    # Sort all transactions by creation date (newest first)
+    transactions.sort(key=lambda x: x['created_at'], reverse=True)
+    
+    # Apply pagination
+    total_transactions = len(transactions)
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_transactions = transactions[start_idx:end_idx]
+    
+    # Calculate pagination info
+    total_pages = (total_transactions + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    
+    return render_template('history.html',
+                         user=user,
+                         transactions=paginated_transactions,
+                         total_transactions=total_transactions,
+                         page=page,
+                         total_pages=total_pages,
+                         has_prev=has_prev,
+                         has_next=has_next,
+                         transaction_type=transaction_type,
+                         date_from=date_from,
+                         date_to=date_to)
+
 @app.route('/api/exchange-rates')
 def api_exchange_rates():
     """API endpoint for live exchange rates"""
