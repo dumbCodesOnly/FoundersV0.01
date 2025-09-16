@@ -323,6 +323,23 @@ def purchase():
             purchase_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             total_cost = gold_amount_k * unit_price  # Calculate total cost based on k amount and price per 1k tokens
             
+            # Get current CAD exchange rate for the purchase
+            from .utils import convert_currency, get_exchange_rates
+            cad_rate = None
+            if currency == 'IRR':
+                # For IRR purchases, get the CAD to IRR rate
+                try:
+                    # Refresh rates to get current data
+                    get_exchange_rates()
+                    # Get 1 CAD in IRR
+                    cad_rate = convert_currency(1.0, 'CAD', 'IRR')
+                except Exception as rate_error:
+                    logging.warning(f"Could not fetch CAD rate for IRR purchase: {rate_error}")
+                    cad_rate = None
+            elif currency == 'CAD':
+                # For CAD purchases, rate is 1.0
+                cad_rate = 1.0
+            
             purchase = Purchase()
             purchase.seller = seller
             purchase.date = purchase_date
@@ -330,6 +347,7 @@ def purchase():
             purchase.unit_price = unit_price  # Store as price per 1000 tokens
             purchase.currency = currency
             purchase.total_cost = total_cost
+            purchase.cad_rate = cad_rate  # Store CAD exchange rate at purchase time
             purchase.created_by = user.id
             
             db.session.add(purchase)

@@ -261,12 +261,15 @@ def create_app():
     try:
         # Import utils for template functions first
         logging.debug("Importing utils for template functions...")
-        from .utils import format_gold_quantity
+        from .utils import format_gold_quantity, format_currency
         logging.debug("Utils imported successfully")
         
-        # Make format function available in templates
+        # Make format functions available in templates
         logging.debug("Registering template functions...")
-        app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+        app.jinja_env.globals.update(
+            format_gold_quantity=format_gold_quantity,
+            format_currency=format_currency
+        )
         logging.debug("Template functions registered")
         
         with app.app_context():
@@ -304,11 +307,14 @@ def create_app():
             logging.debug(f"App state: {vars(app) if hasattr(app, '__dict__') else 'No app dict'}")
             logging.debug(f"DB state: {vars(db) if hasattr(db, '__dict__') else 'No db dict'}")
         
-        # Fallback - still register template function
+        # Fallback - still register template functions
         try:
             logging.debug("Attempting fallback template function registration...")
-            from .utils import format_gold_quantity
-            app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+            from .utils import format_gold_quantity, format_currency
+            app.jinja_env.globals.update(
+                format_gold_quantity=format_gold_quantity,
+                format_currency=format_currency
+            )
             logging.info("Template functions registered in fallback mode")
         except Exception as template_error:
             logging.error(f"Template function registration failed: {template_error}")
@@ -319,8 +325,11 @@ def create_app():
 # Register template functions globally before app initialization
 try:
     logging.debug("Attempting early template function registration...")
-    from .utils import format_gold_quantity
-    app.jinja_env.globals.update(format_gold_quantity=format_gold_quantity)
+    from .utils import format_gold_quantity, format_currency
+    app.jinja_env.globals.update(
+        format_gold_quantity=format_gold_quantity,
+        format_currency=format_currency
+    )
     logging.info("Template functions registered successfully")
 except Exception as e:
     logging.error(f"Failed to register template functions: {e}")
