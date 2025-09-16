@@ -216,6 +216,7 @@ def telegram_auth():
         
         # Platform-specific error messages
         error_message = 'Authentication failed'
+        platform_info = data.get('platform_info', {}) if 'data' in locals() else {}
         if platform_info.get('is_desktop'):
             error_message = 'Desktop Telegram authentication failed. Please try refreshing the app or reopening from Telegram.'
         elif platform_info.get('is_mobile'):

@@ -2,6 +2,8 @@
 
 Founders Management is a Flask-based web application designed for World of Warcraft (WoW) gold trading businesses to manage purchases, sales, and inventory tracking. The system integrates with Telegram WebApp for user authentication and provides real-time exchange rate monitoring, profit calculations, and comprehensive transaction management. Gold quantities are displayed in the standard WoW format (1k, 2k, 1.5k, etc.).
 
+**Status**: Successfully imported and configured for Replit environment (September 16, 2025)
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -61,12 +63,25 @@ Preferred communication style: Simple, everyday language.
 - **Werkzeug**: WSGI utilities including ProxyFix for deployment
 
 ## Development Environment
-- **SQLite**: Local development database (Replit)
-- **Neon PostgreSQL**: Production database for Vercel deployment with optimized connection pooling
+- **PostgreSQL**: Development database provided by Replit's built-in PostgreSQL service
+- **Neon PostgreSQL**: Production database for Vercel deployment with optimized connection pooling  
 - **Environment Variables**: Configuration management for API keys, database URLs, and application secrets
+- **Replit Configuration**: Web application configured to run on port 5000 with proper proxy settings
 
 ## Deployment Configuration
 - **Hybrid Environment Support**: Automatically detects and configures for Replit (dev) vs Vercel (production)
 - **Neon Database Integration**: Optimized connection settings for Neon's serverless PostgreSQL
 - **SSL Security**: Required SSL connections for production database
 - **Connection Pooling**: Configured for Vercel's serverless environment
+- **Replit Deployment**: Configured for autoscale deployment target with proper WSGI configuration
+
+# Recent Changes
+
+## September 16, 2025 - GitHub Import and Replit Setup
+- Successfully imported Flask application from GitHub repository
+- Configured for Replit environment with PostgreSQL database integration
+- Set up proper web workflow on port 5000 with webview output
+- Cleaned up requirements.txt to remove duplicates
+- Fixed minor LSP diagnostics for better code quality
+- Configured deployment settings for production readiness
+- Application successfully running with Telegram WebApp authentication interface

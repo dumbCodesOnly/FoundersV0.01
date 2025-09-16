@@ -156,7 +156,7 @@ def init_database():
         
         # Debug: Check database and model registry state
         logging.debug(f"Database instance: {db}")
-        logging.debug(f"Database models registry: {list(db.Model.registry._class_registry.keys()) if hasattr(db.Model, 'registry') else 'No registry found'}")
+        logging.debug(f"Database models registry: {list(db.Model.registry._class_registry.keys()) if hasattr(db.Model, 'registry') and hasattr(db.Model.registry, '_class_registry') else 'No registry found'}")
         
         # Create all tables with detailed error handling
         logging.debug("Calling db.create_all()...")
