@@ -87,69 +87,129 @@ def get_exchange_rates():
     rates = {}
     usd_to_irr_rate = None
     
-    # Try TGJU for direct CAD to IRR free market rates (most accurate)
+    import re
+    
+    # PRIMARY SOURCE: Try TGJU for direct USD to IRR free market rate (most accurate)
     try:
-        tgju_url = "https://www.tgju.org/profile/price_cad"
+        tgju_url = "https://www.tgju.org"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9,fa;q=0.8'
         }
         
-        cad_response = requests.get(tgju_url, headers=headers, timeout=15)
-        if cad_response.status_code == 200:
-            response_text = cad_response.text
-            # Parse CAD rate from HTML content - look for "نرخ فعلی" (Current Rate)
-            import re
+        response = requests.get(tgju_url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            response_text = response.text
             
-            # Look for CAD rate pattern - try multiple approaches
-            cad_rate = None
+            # Look for USD rate (دلار) in the page - multiple patterns to match different formats
+            usd_rate = None
             
-            # Pattern 1: Look for table row with "نرخ فعلی" and extract number
-            table_pattern = r'<td[^>]*>نرخ فعلی</td>\s*<td[^>]*>([0-9,]+)</td>'
-            match = re.search(table_pattern, response_text)
+            # Pattern 1: Look for the dollar rate in table format with دلار label
+            # Format: <td>دلار</td><td>1,191,550</td> or similar
+            table_patterns = [
+                r'دلار[^<]*</[^>]*>\s*<[^>]*>([0-9,]+)',
+                r'>دلار<.*?>([0-9]{1,3}(?:,[0-9]{3})+)<',
+                r'دلار.*?([0-9]{1,3}(?:,[0-9]{3}){2,})',
+            ]
             
-            if match:
-                cad_rate_str = match.group(1).replace(',', '')
-                cad_rate = float(cad_rate_str)
+            for pattern in table_patterns:
+                matches = re.findall(pattern, response_text, re.DOTALL)
+                if matches:
+                    for match_str in matches:
+                        clean_rate = match_str.replace(',', '')
+                        if clean_rate.isdigit():
+                            test_rate = float(clean_rate)
+                            # USD to IRR should be in range 1,000,000 - 1,500,000 (realistic 2025 rates)
+                            if 1000000 <= test_rate <= 1500000:
+                                usd_rate = test_rate
+                                logging.info(f"Found USD to IRR rate from TGJU using pattern: {usd_rate}")
+                                break
+                if usd_rate:
+                    break
+            
+            # Pattern 2: Try the profile page for USD rate directly
+            if not usd_rate:
+                try:
+                    usd_profile_url = "https://www.tgju.org/profile/price_dollar_rl"
+                    usd_response = requests.get(usd_profile_url, headers=headers, timeout=10)
+                    if usd_response.status_code == 200:
+                        usd_text = usd_response.text
+                        # Look for "نرخ فعلی" (Current Rate) followed by number
+                        rate_patterns = [
+                            r'نرخ فعلی[^<]*</[^>]*>\s*<[^>]*>([0-9,]+)',
+                            r'([0-9]{1,3}(?:,[0-9]{3}){2,})',
+                        ]
+                        for pattern in rate_patterns:
+                            matches = re.findall(pattern, usd_text)
+                            if matches:
+                                for match_str in matches:
+                                    clean_rate = match_str.replace(',', '')
+                                    if clean_rate.isdigit():
+                                        test_rate = float(clean_rate)
+                                        if 1000000 <= test_rate <= 1500000:
+                                            usd_rate = test_rate
+                                            logging.info(f"Found USD to IRR rate from TGJU profile page: {usd_rate}")
+                                            break
+                            if usd_rate:
+                                break
+                except Exception as profile_error:
+                    logging.warning(f"Failed to get USD rate from TGJU profile: {profile_error}")
+            
+            if usd_rate:
+                usd_to_irr_rate = usd_rate
+                rates['USD_to_IRR'] = usd_rate
+                # Calculate CAD to IRR from USD rate (CAD/USD ~0.74)
+                cad_rate = usd_rate * 0.74
+                rates['IRR'] = cad_rate
+                logging.info(f"Got USD to IRR rate from TGJU: {usd_rate} IRR/USD, CAD to IRR: {cad_rate}")
             else:
-                # Pattern 2: Look for span or div containing the rate number near "نرخ فعلی"
-                # Try to find any 6-digit number with commas (typical IRR format)
+                logging.warning("Could not parse USD rate from TGJU website")
+    except Exception as e:
+        logging.warning(f"Failed to get USD rate from TGJU: {e}")
+    
+    # SECONDARY SOURCE: Try TGJU for CAD rate if USD rate wasn't found
+    if 'USD_to_IRR' not in rates:
+        try:
+            tgju_cad_url = "https://www.tgju.org/profile/price_cad"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+            
+            cad_response = requests.get(tgju_cad_url, headers=headers, timeout=15)
+            if cad_response.status_code == 200:
+                response_text = cad_response.text
+                
+                cad_rate = None
                 rate_patterns = [
-                    r'(?:نرخ فعلی|Current Rate)[:\s]*.*?([0-9]{3,4},[0-9]{3})',
-                    r'<[^>]*>([0-9]{3,4},[0-9]{3})</[^>]*>',
-                    r'([0-9]{3,4},[0-9]{3})'  # Generic 6-digit number pattern
+                    r'نرخ فعلی[^<]*</[^>]*>\s*<[^>]*>([0-9,]+)',
+                    r'([0-9]{3,4},[0-9]{3})',
                 ]
                 
                 for pattern in rate_patterns:
                     matches = re.findall(pattern, response_text)
                     if matches:
-                        # Look for rates in realistic range (400k-800k for CAD)
                         for match_str in matches:
                             test_rate = float(match_str.replace(',', ''))
-                            if 400000 <= test_rate <= 900000:
+                            if 700000 <= test_rate <= 1200000:
                                 cad_rate = test_rate
                                 logging.info(f"Found CAD rate using pattern '{pattern}': {cad_rate}")
                                 break
                     if cad_rate:
                         break
-            
-            # Validate and use the rate if found
-            if cad_rate and cad_rate > 400000:
-                rates['IRR'] = cad_rate
-                logging.info(f"Got CAD to IRR rate from TGJU: {cad_rate} IRR/CAD")
                 
-                # Calculate USD to IRR rate from CAD rate (CAD to USD ~0.74)
-                if 'USD_to_IRR' not in rates:
-                    usd_rate = cad_rate / 0.74  # Convert CAD/IRR to USD/IRR
+                if cad_rate and cad_rate > 700000:
+                    rates['IRR'] = cad_rate
+                    logging.info(f"Got CAD to IRR rate from TGJU: {cad_rate} IRR/CAD")
+                    
+                    # Calculate USD to IRR rate from CAD rate (CAD to USD ~0.74)
+                    usd_rate = cad_rate / 0.74
                     usd_to_irr_rate = usd_rate
                     rates['USD_to_IRR'] = usd_rate
                     logging.info(f"Calculated USD to IRR rate from TGJU CAD rate: {usd_rate} IRR/USD")
-            elif cad_rate:
-                logging.warning(f"TGJU returned unrealistic CAD rate: {cad_rate} IRR/CAD")
-            else:
-                logging.warning("Could not parse CAD rate from TGJU website")
-    except Exception as e:
-        logging.warning(f"Failed to get CAD rate from TGJU: {e}")
+        except Exception as e:
+            logging.warning(f"Failed to get CAD rate from TGJU: {e}")
 
     # Try free market IRR rate from PriceToDay API as fallback (if TGJU fails)
     if 'USD_to_IRR' not in rates:
@@ -307,15 +367,15 @@ def get_exchange_rates():
             logging.info(f"Using fallback USD rate: 0.74 (database error: {e})")
     
     if 'USD_to_IRR' not in rates:
-        # Updated fallback rate to realistic 2025 free market rate (~1M IRR/USD)
-        fallback_usd_to_irr = 1001000  # Current free market rate as specified by user
+        # Updated fallback rate to realistic 2025 free market rate from tgju.org
+        fallback_usd_to_irr = 1193720  # Current free market rate from tgju.org
         rates['USD_to_IRR'] = fallback_usd_to_irr
         usd_to_irr_rate = fallback_usd_to_irr
         logging.info(f"Using fallback USD to IRR rate: {fallback_usd_to_irr} (free market rate - APIs failed)")
     
     if 'IRR' not in rates:
         # Calculate IRR/CAD from USD/IRR rate
-        irr_per_cad = usd_to_irr_rate * 0.74 if usd_to_irr_rate else 740740  # 1,001,000 * 0.74
+        irr_per_cad = usd_to_irr_rate * 0.74 if usd_to_irr_rate else 883353  # 1,193,720 * 0.74
         rates['IRR'] = irr_per_cad
         logging.info(f"Calculated IRR/CAD rate: {irr_per_cad}")
     
@@ -442,15 +502,15 @@ def convert_currency(amount, from_currency, to_currency):
     if from_currency == 'CAD' and to_currency == 'USD':
         return amount * 0.74  # Conservative fallback
     elif from_currency == 'CAD' and to_currency == 'IRR':
-        return amount * 750360  # Updated realistic rate
+        return amount * 883353  # Updated realistic rate (1,193,720 * 0.74)
     elif from_currency == 'USD' and to_currency == 'CAD':
         return amount * 1.35
     elif from_currency == 'USD' and to_currency == 'IRR':
-        return amount * 1014000  # NIMA/free market rate
+        return amount * 1193720  # Free market rate from tgju.org
     elif from_currency == 'IRR' and to_currency == 'CAD':
-        return amount / 750360
+        return amount / 883353
     elif from_currency == 'IRR' and to_currency == 'USD':
-        return amount / 1014000
+        return amount / 1193720
     else:
         return amount
 
