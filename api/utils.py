@@ -71,313 +71,225 @@ def format_currency(amount, currency='CAD'):
         return f"0 {currency}"
 
 def get_exchange_rates():
-    """Fetch live exchange rates from multiple sources with accurate Iranian Rial rates"""
+    """Fetch live exchange rates from tgju.org - all rates fetched directly, no hardcoded values"""
     # Check cache first (cache for 15 minutes to avoid repeated API calls)
     cached_rates = get_cached_value('exchange_rates', 15)
     if cached_rates:
         logging.debug("Using cached exchange rates")
         return cached_rates
     
-    logging.debug("Fetching fresh exchange rates from APIs")
+    logging.debug("Fetching fresh exchange rates from tgju.org")
     
     # Late imports to avoid circular dependency
     from .models import ExchangeRate
     from .app import db
     
     rates = {}
-    usd_to_irr_rate = None
-    
     import re
     
-    # PRIMARY SOURCE: Try TGJU for direct USD to IRR free market rate (most accurate)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,fa;q=0.8'
+    }
+    
+    # STEP 1: Fetch USD to IRR rate directly from tgju.org
     try:
-        tgju_url = "https://www.tgju.org"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9,fa;q=0.8'
-        }
-        
-        response = requests.get(tgju_url, headers=headers, timeout=15)
-        if response.status_code == 200:
-            response_text = response.text
-            
-            # Look for USD rate (دلار) in the page - multiple patterns to match different formats
+        usd_profile_url = "https://www.tgju.org/profile/price_dollar_rl"
+        usd_response = requests.get(usd_profile_url, headers=headers, timeout=15)
+        if usd_response.status_code == 200:
+            usd_text = usd_response.text
             usd_rate = None
             
-            # Pattern 1: Look for the dollar rate in table format with دلار label
-            # Format: <td>دلار</td><td>1,191,550</td> or similar
-            table_patterns = [
-                r'دلار[^<]*</[^>]*>\s*<[^>]*>([0-9,]+)',
-                r'>دلار<.*?>([0-9]{1,3}(?:,[0-9]{3})+)<',
-                r'دلار.*?([0-9]{1,3}(?:,[0-9]{3}){2,})',
+            # Pattern to find "نرخ فعلی" (Current Rate) in the table
+            # Look for: نرخ فعلی | 1,191,550
+            rate_patterns = [
+                r'نرخ فعلی\s*\|\s*([0-9,]+)',
+                r'نرخ فعلی[^0-9]*([0-9]{1,3}(?:,[0-9]{3})+)',
+                r'>نرخ فعلی<[^>]*>[^>]*>([0-9,]+)<',
             ]
             
-            for pattern in table_patterns:
-                matches = re.findall(pattern, response_text, re.DOTALL)
+            for pattern in rate_patterns:
+                matches = re.findall(pattern, usd_text, re.DOTALL)
                 if matches:
                     for match_str in matches:
-                        clean_rate = match_str.replace(',', '')
+                        clean_rate = match_str.replace(',', '').strip()
                         if clean_rate.isdigit():
                             test_rate = float(clean_rate)
-                            # USD to IRR should be in range 1,000,000 - 1,500,000 (realistic 2025 rates)
-                            if 1000000 <= test_rate <= 1500000:
+                            # USD to IRR should be in range 500,000 - 2,000,000 (realistic range)
+                            if 500000 <= test_rate <= 2000000:
                                 usd_rate = test_rate
-                                logging.info(f"Found USD to IRR rate from TGJU using pattern: {usd_rate}")
+                                logging.info(f"Found USD to IRR rate from TGJU profile: {usd_rate}")
                                 break
                 if usd_rate:
                     break
             
-            # Pattern 2: Try the profile page for USD rate directly
-            if not usd_rate:
-                try:
-                    usd_profile_url = "https://www.tgju.org/profile/price_dollar_rl"
-                    usd_response = requests.get(usd_profile_url, headers=headers, timeout=10)
-                    if usd_response.status_code == 200:
-                        usd_text = usd_response.text
-                        # Look for "نرخ فعلی" (Current Rate) followed by number
-                        rate_patterns = [
-                            r'نرخ فعلی[^<]*</[^>]*>\s*<[^>]*>([0-9,]+)',
-                            r'([0-9]{1,3}(?:,[0-9]{3}){2,})',
-                        ]
-                        for pattern in rate_patterns:
-                            matches = re.findall(pattern, usd_text)
-                            if matches:
-                                for match_str in matches:
-                                    clean_rate = match_str.replace(',', '')
-                                    if clean_rate.isdigit():
-                                        test_rate = float(clean_rate)
-                                        if 1000000 <= test_rate <= 1500000:
-                                            usd_rate = test_rate
-                                            logging.info(f"Found USD to IRR rate from TGJU profile page: {usd_rate}")
-                                            break
-                            if usd_rate:
-                                break
-                except Exception as profile_error:
-                    logging.warning(f"Failed to get USD rate from TGJU profile: {profile_error}")
-            
             if usd_rate:
-                usd_to_irr_rate = usd_rate
                 rates['USD_to_IRR'] = usd_rate
-                # Calculate CAD to IRR from USD rate (CAD/USD ~0.74)
-                cad_rate = usd_rate * 0.74
-                rates['IRR'] = cad_rate
-                logging.info(f"Got USD to IRR rate from TGJU: {usd_rate} IRR/USD, CAD to IRR: {cad_rate}")
+                logging.info(f"Got USD to IRR rate from tgju.org: {usd_rate} IRR/USD")
             else:
-                logging.warning("Could not parse USD rate from TGJU website")
+                logging.warning("Could not parse USD rate from TGJU profile page")
     except Exception as e:
         logging.warning(f"Failed to get USD rate from TGJU: {e}")
     
-    # SECONDARY SOURCE: Try TGJU for CAD rate if USD rate wasn't found
-    if 'USD_to_IRR' not in rates:
-        try:
-            tgju_cad_url = "https://www.tgju.org/profile/price_cad"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-            }
-            
-            cad_response = requests.get(tgju_cad_url, headers=headers, timeout=15)
-            if cad_response.status_code == 200:
-                response_text = cad_response.text
-                
-                cad_rate = None
-                rate_patterns = [
-                    r'نرخ فعلی[^<]*</[^>]*>\s*<[^>]*>([0-9,]+)',
-                    r'([0-9]{3,4},[0-9]{3})',
-                ]
-                
-                for pattern in rate_patterns:
-                    matches = re.findall(pattern, response_text)
-                    if matches:
-                        for match_str in matches:
-                            test_rate = float(match_str.replace(',', ''))
-                            if 700000 <= test_rate <= 1200000:
-                                cad_rate = test_rate
-                                logging.info(f"Found CAD rate using pattern '{pattern}': {cad_rate}")
-                                break
-                    if cad_rate:
-                        break
-                
-                if cad_rate and cad_rate > 700000:
-                    rates['IRR'] = cad_rate
-                    logging.info(f"Got CAD to IRR rate from TGJU: {cad_rate} IRR/CAD")
-                    
-                    # Calculate USD to IRR rate from CAD rate (CAD to USD ~0.74)
-                    usd_rate = cad_rate / 0.74
-                    usd_to_irr_rate = usd_rate
-                    rates['USD_to_IRR'] = usd_rate
-                    logging.info(f"Calculated USD to IRR rate from TGJU CAD rate: {usd_rate} IRR/USD")
-        except Exception as e:
-            logging.warning(f"Failed to get CAD rate from TGJU: {e}")
-
-    # Try free market IRR rate from PriceToDay API as fallback (if TGJU fails)
-    if 'USD_to_IRR' not in rates:
-        try:
-            # PriceToDay provides free market rates
-            priceto_url = "https://api.priceto.day/v1/latest/irr/usd"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-            
-            irr_response = requests.get(priceto_url, headers=headers, timeout=10)
-            if irr_response.status_code == 200:
-                irr_data = irr_response.json()
-                # PriceToDay returns rates in format: {"usd": {"rate": 1014000}}
-                if 'usd' in irr_data and 'rate' in irr_data['usd']:
-                    irr_per_usd = float(irr_data['usd']['rate'])
-                    # Validate that it's a realistic free market rate (should be > 500,000)
-                    if irr_per_usd > 500000:
-                        usd_to_irr_rate = irr_per_usd
-                        rates['USD_to_IRR'] = irr_per_usd
-                        # Only set CAD rate if not already set from TGJU
-                        if 'IRR' not in rates:
-                            irr_per_cad = irr_per_usd * 0.74
-                            rates['IRR'] = irr_per_cad
-                        logging.info(f"Got USD to IRR rate from PriceToDay: {irr_per_usd} IRR/USD")
-                    else:
-                        logging.warning(f"PriceToDay returned unrealistic rate: {irr_per_usd} IRR/USD (seems like official rate, not free market)")
-        except Exception as e:
-            logging.warning(f"Failed to get IRR rate from PriceToDay: {e}")
-
-    # Try BONBAST as fallback for IRR (if TGJU and PriceToDay both fail)
-    if 'IRR' not in rates or 'USD_to_IRR' not in rates:
-        try:
-            # BONBAST provides free market rates
-            bonbast_response = requests.get("https://bonbast.com/json", timeout=10)
-            if bonbast_response.status_code == 200:
-                bonbast_data = bonbast_response.json()
-                # BONBAST returns rates in different format
-                if 'usd1' in bonbast_data:  # USD sell rate
-                    irr_per_usd = float(bonbast_data['usd1'])
-                    # Validate that it's a realistic free market rate
-                    if irr_per_usd > 500000:
-                        usd_to_irr_rate = irr_per_usd
-                        irr_per_cad = irr_per_usd * 0.74
-                        rates['IRR'] = irr_per_cad
-                        rates['USD_to_IRR'] = irr_per_usd
-                        logging.info(f"Got free market IRR rate from BONBAST: {irr_per_cad} IRR/CAD, {irr_per_usd} IRR/USD")
-                    else:
-                        logging.warning(f"BONBAST returned unrealistic rate: {irr_per_usd} IRR/USD")
-        except Exception as e:
-            logging.warning(f"Failed to get IRR rate from BONBAST: {e}")
-
-    # Skip ExchangeRate-API as it only provides official rates (~42,000), not free market rates
-    
-    # Get CAD to USD rate from multiple reliable free sources
-    # Try exchangerates-api.io first (free, no API key required)
+    # STEP 2: Fetch CAD to IRR rate directly from tgju.org (NOT calculated from USD)
     try:
-        response = requests.get("https://api.exchangerates-api.io/v1/latest?base=CAD&symbols=USD", timeout=10)
+        cad_profile_url = "https://www.tgju.org/profile/price_cad"
+        cad_response = requests.get(cad_profile_url, headers=headers, timeout=15)
+        if cad_response.status_code == 200:
+            cad_text = cad_response.text
+            cad_rate = None
+            
+            # Pattern to find "نرخ فعلی" (Current Rate) in the table
+            # Look for: نرخ فعلی | 852,600
+            rate_patterns = [
+                r'نرخ فعلی\s*\|\s*([0-9,]+)',
+                r'نرخ فعلی[^0-9]*([0-9]{1,3}(?:,[0-9]{3})+)',
+                r'>نرخ فعلی<[^>]*>[^>]*>([0-9,]+)<',
+            ]
+            
+            for pattern in rate_patterns:
+                matches = re.findall(pattern, cad_text, re.DOTALL)
+                if matches:
+                    for match_str in matches:
+                        clean_rate = match_str.replace(',', '').strip()
+                        if clean_rate.isdigit():
+                            test_rate = float(clean_rate)
+                            # CAD to IRR should be in range 400,000 - 1,500,000 (realistic range)
+                            if 400000 <= test_rate <= 1500000:
+                                cad_rate = test_rate
+                                logging.info(f"Found CAD to IRR rate from TGJU profile: {cad_rate}")
+                                break
+                if cad_rate:
+                    break
+            
+            if cad_rate:
+                rates['IRR'] = cad_rate
+                logging.info(f"Got CAD to IRR rate from tgju.org: {cad_rate} IRR/CAD")
+            else:
+                logging.warning("Could not parse CAD rate from TGJU profile page")
+    except Exception as e:
+        logging.warning(f"Failed to get CAD rate from TGJU: {e}")
+    
+    # STEP 3: If TGJU profile pages failed, try the main page
+    if 'USD_to_IRR' not in rates or 'IRR' not in rates:
+        try:
+            tgju_url = "https://www.tgju.org"
+            response = requests.get(tgju_url, headers=headers, timeout=15)
+            if response.status_code == 200:
+                response_text = response.text
+                
+                # Try to find USD rate (دلار) if not already found
+                if 'USD_to_IRR' not in rates:
+                    usd_patterns = [
+                        r'دلار[^<]*</[^>]*>\s*<[^>]*>([0-9,]+)',
+                        r'>دلار<.*?>([0-9]{1,3}(?:,[0-9]{3})+)<',
+                    ]
+                    for pattern in usd_patterns:
+                        matches = re.findall(pattern, response_text, re.DOTALL)
+                        if matches:
+                            for match_str in matches:
+                                clean_rate = match_str.replace(',', '')
+                                if clean_rate.isdigit():
+                                    test_rate = float(clean_rate)
+                                    if 500000 <= test_rate <= 2000000:
+                                        rates['USD_to_IRR'] = test_rate
+                                        logging.info(f"Found USD to IRR rate from TGJU main page: {test_rate}")
+                                        break
+                        if 'USD_to_IRR' in rates:
+                            break
+        except Exception as e:
+            logging.warning(f"Failed to get rates from TGJU main page: {e}")
+    
+    # STEP 4: Get CAD to USD rate from reliable sources for cross-conversions
+    try:
+        response = requests.get("https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?recent=1", timeout=10)
         if response.status_code == 200:
             data = response.json()
-            if data.get('success', True) and 'rates' in data:
-                exchange_rates = data.get('rates', {})
-                if 'USD' in exchange_rates:
-                    usd_rate = float(exchange_rates['USD'])
-                    if 0.65 <= usd_rate <= 0.85:  # Validate reasonable range
-                        rates['USD'] = usd_rate
-                        logging.info(f"Got USD rate from exchangerates-api.io: {usd_rate}")
-                    else:
-                        logging.warning(f"USD rate from exchangerates-api.io out of range: {usd_rate}")
+            if 'observations' in data and len(data['observations']) > 0:
+                usd_cad_rate = float(data['observations'][0]['FXUSDCAD']['v'])
+                if usd_cad_rate > 0:
+                    cad_usd_rate = 1 / usd_cad_rate
+                    if 0.60 <= cad_usd_rate <= 0.90:
+                        rates['USD'] = cad_usd_rate
+                        logging.info(f"Got CAD/USD rate from Bank of Canada: {cad_usd_rate}")
     except Exception as e:
-        logging.warning(f"Failed to get USD rate from exchangerates-api.io: {e}")
+        logging.warning(f"Failed to get USD rate from Bank of Canada: {e}")
     
-    # Try exchangerate.host as backup (fixed URL encoding)
+    # Try alternative sources for CAD/USD if Bank of Canada failed
     if 'USD' not in rates:
         try:
-            url = "https://api.exchangerate.host/latest"
-            params = {"base": "CAD", "symbols": "USD"}
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get("https://api.exchangerates-api.io/v1/latest?base=CAD&symbols=USD", timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                logging.debug(f"exchangerate.host response: {data}")
                 if data.get('success', True) and 'rates' in data:
-                    exchange_rates = data.get('rates', {})
-                    if 'USD' in exchange_rates:
-                        usd_rate = float(exchange_rates['USD'])
-                        if 0.65 <= usd_rate <= 0.85:  # Validate reasonable range
+                    if 'USD' in data['rates']:
+                        usd_rate = float(data['rates']['USD'])
+                        if 0.60 <= usd_rate <= 0.90:
                             rates['USD'] = usd_rate
-                            logging.info(f"Got USD rate from exchangerate.host: {usd_rate}")
-                        else:
-                            logging.warning(f"USD rate from exchangerate.host out of range: {usd_rate}")
+                            logging.info(f"Got CAD/USD rate from exchangerates-api.io: {usd_rate}")
         except Exception as e:
-            logging.warning(f"Failed to get USD rate from exchangerate.host: {e}")
+            logging.warning(f"Failed to get USD rate from exchangerates-api.io: {e}")
     
-    # Try Bank of Canada as backup (official rates)
+    # STEP 5: If online sources failed, try database cache (no hardcoded values)
+    if 'USD_to_IRR' not in rates:
+        try:
+            recent_rate = ExchangeRate.query.filter_by(
+                from_currency='USD', 
+                to_currency='IRR'
+            ).order_by(ExchangeRate.updated_at.desc()).first()
+            
+            if recent_rate and recent_rate.updated_at:
+                time_diff = datetime.utcnow() - recent_rate.updated_at
+                if time_diff.total_seconds() < 86400:  # 24 hours
+                    rates['USD_to_IRR'] = recent_rate.rate
+                    logging.info(f"Using cached database USD to IRR rate: {recent_rate.rate}")
+                else:
+                    logging.warning("Database USD to IRR rate is too old (>24h), cannot use")
+            else:
+                logging.warning("No USD to IRR rate in database")
+        except Exception as e:
+            logging.warning(f"Failed to get USD to IRR rate from database: {e}")
+    
+    if 'IRR' not in rates:
+        try:
+            recent_rate = ExchangeRate.query.filter_by(
+                from_currency='CAD', 
+                to_currency='IRR'
+            ).order_by(ExchangeRate.updated_at.desc()).first()
+            
+            if recent_rate and recent_rate.updated_at:
+                time_diff = datetime.utcnow() - recent_rate.updated_at
+                if time_diff.total_seconds() < 86400:  # 24 hours
+                    rates['IRR'] = recent_rate.rate
+                    logging.info(f"Using cached database CAD to IRR rate: {recent_rate.rate}")
+                else:
+                    logging.warning("Database CAD to IRR rate is too old (>24h), cannot use")
+            else:
+                logging.warning("No CAD to IRR rate in database")
+        except Exception as e:
+            logging.warning(f"Failed to get CAD to IRR rate from database: {e}")
+    
     if 'USD' not in rates:
         try:
-            response = requests.get("https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?recent=1", timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if 'observations' in data and len(data['observations']) > 0:
-                    # Bank of Canada returns USD/CAD rate, so we need to invert it for CAD/USD
-                    usd_cad_rate = float(data['observations'][0]['FXUSDCAD']['v'])
-                    if usd_cad_rate > 0:
-                        cad_usd_rate = 1 / usd_cad_rate
-                        if 0.65 <= cad_usd_rate <= 0.85:  # Validate reasonable range
-                            rates['USD'] = cad_usd_rate
-                            logging.info(f"Got USD rate from Bank of Canada: {cad_usd_rate}")
-        except Exception as e:
-            logging.warning(f"Failed to get USD rate from Bank of Canada: {e}")
-    
-    # Try ECB (European Central Bank) as another backup
-    if 'USD' not in rates:
-        try:
-            response = requests.get("https://api.exchangerate.host/latest?base=USD&symbols=CAD", timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success', True) and 'rates' in data:
-                    exchange_rates = data.get('rates', {})
-                    if 'CAD' in exchange_rates:
-                        # This gives us USD to CAD, so invert for CAD to USD
-                        usd_cad_rate = float(exchange_rates['CAD'])
-                        if usd_cad_rate > 0:
-                            cad_usd_rate = 1 / usd_cad_rate
-                            if 0.65 <= cad_usd_rate <= 0.85:  # Validate reasonable range
-                                rates['USD'] = cad_usd_rate
-                                logging.info(f"Got USD rate from ECB (inverted): {cad_usd_rate}")
-        except Exception as e:
-            logging.warning(f"Failed to get USD rate from ECB: {e}")
-    
-    # Use REALISTIC fallback rates if APIs fail (updated for 2025)
-    if 'USD' not in rates:
-        # Try to get the most recent rate from database first
-        try:
-            from .models import ExchangeRate
-            recent_usd_rate = ExchangeRate.query.filter_by(
+            recent_rate = ExchangeRate.query.filter_by(
                 from_currency='CAD', 
                 to_currency='USD'
             ).order_by(ExchangeRate.updated_at.desc()).first()
             
-            if recent_usd_rate and recent_usd_rate.updated_at:
-                # Use database rate if it's less than 24 hours old
-                time_diff = datetime.utcnow() - recent_usd_rate.updated_at
+            if recent_rate and recent_rate.updated_at:
+                time_diff = datetime.utcnow() - recent_rate.updated_at
                 if time_diff.total_seconds() < 86400:  # 24 hours
-                    rates['USD'] = recent_usd_rate.rate
-                    logging.info(f"Using recent database USD rate: {recent_usd_rate.rate}")
-                else:
-                    rates['USD'] = 0.74
-                    logging.info("Using fallback USD rate: 0.74 (database rate too old)")
-            else:
-                rates['USD'] = 0.74
-                logging.info("Using fallback USD rate: 0.74 (no database rate found)")
+                    rates['USD'] = recent_rate.rate
+                    logging.info(f"Using cached database CAD to USD rate: {recent_rate.rate}")
         except Exception as e:
-            rates['USD'] = 0.74
-            logging.info(f"Using fallback USD rate: 0.74 (database error: {e})")
+            logging.warning(f"Failed to get CAD to USD rate from database: {e}")
     
+    # Log warning if rates are missing
     if 'USD_to_IRR' not in rates:
-        # Updated fallback rate to realistic 2025 free market rate from tgju.org
-        fallback_usd_to_irr = 1193720  # Current free market rate from tgju.org
-        rates['USD_to_IRR'] = fallback_usd_to_irr
-        usd_to_irr_rate = fallback_usd_to_irr
-        logging.info(f"Using fallback USD to IRR rate: {fallback_usd_to_irr} (free market rate - APIs failed)")
-    
+        logging.error("CRITICAL: Could not fetch USD to IRR rate from any source!")
     if 'IRR' not in rates:
-        # Calculate IRR/CAD from USD/IRR rate
-        irr_per_cad = usd_to_irr_rate * 0.74 if usd_to_irr_rate else 883353  # 1,193,720 * 0.74
-        rates['IRR'] = irr_per_cad
-        logging.info(f"Calculated IRR/CAD rate: {irr_per_cad}")
+        logging.error("CRITICAL: Could not fetch CAD to IRR rate from any source!")
     
     # Update database with fetched rates
     try:
@@ -497,22 +409,11 @@ def convert_currency(amount, from_currency, to_currency):
         logging.debug(f"Using fresh inverted rate USD->CAD: {usd_cad_rate}")
         return amount * usd_cad_rate
     
-    # Priority 5: Fallback to realistic static rates (only as last resort)
-    logging.warning(f"Using fallback conversion for {from_currency}->{to_currency}")
-    if from_currency == 'CAD' and to_currency == 'USD':
-        return amount * 0.74  # Conservative fallback
-    elif from_currency == 'CAD' and to_currency == 'IRR':
-        return amount * 883353  # Updated realistic rate (1,193,720 * 0.74)
-    elif from_currency == 'USD' and to_currency == 'CAD':
-        return amount * 1.35
-    elif from_currency == 'USD' and to_currency == 'IRR':
-        return amount * 1193720  # Free market rate from tgju.org
-    elif from_currency == 'IRR' and to_currency == 'CAD':
-        return amount / 883353
-    elif from_currency == 'IRR' and to_currency == 'USD':
-        return amount / 1193720
-    else:
-        return amount
+    # Priority 5: No conversion possible - return original amount and log error
+    logging.error(f"CRITICAL: Could not convert {from_currency}->{to_currency} - no rates available from any source!")
+    logging.error("Exchange rate data unavailable. Please check tgju.org connection.")
+    # Return original amount with warning - don't use hardcoded values
+    return amount
 
 def calculate_inventory_and_profit():
     """Calculate remaining WoW gold inventory and profit using FIFO method"""
